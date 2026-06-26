@@ -7,6 +7,7 @@ import profileRoutes from "./routes/profile.routes.js";
 import savingsRoutes from "./routes/savings.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
+import { sharedSavingsRouter, sharedTransactionRouter } from "./routes/sharedSavings.routes.js";
 
 dotenv.config();
 
@@ -37,6 +38,16 @@ app.use(
 app.use(
     "/api/dashboard",
     dashboardRoutes
+);
+
+app.use(
+    "/api/shared-savings",
+    sharedSavingsRouter
+);
+
+app.use(
+    "/api/shared-transactions",
+    sharedTransactionRouter
 );
 
 import errorHandler from "./middlewares/errorHandler.js";

@@ -7,6 +7,9 @@ $token = $null
 $refreshToken = $null
 $savingsId = $null
 $transactionId = $null
+$sharedSavingsId = $null
+$sharedTransactionId = $null
+$sharedInviteCode = $null
 
 function LogTest {
     param(
@@ -406,17 +409,189 @@ try {
 # 5.2 Get Statistics
 Write-Host "5.2 Get Statistics" -ForegroundColor Cyan
 try {
-    $response = Invoke-WebRequest -Uri "$baseUrl/statistics" -Method GET `
+    $response = Invoke-WebRequest -Uri "$baseUrl/dashboard/statistics" -Method GET `
         -Headers $headers -UseBasicParsing
     $data = $response.Content | ConvertFrom-Json
     $monthCount = if ($data.data.per_month) { $data.data.per_month.Count } else { 0 }
-    LogTest "STATISTICS" "/statistics" "GET" "PASS" "Months: $monthCount"
+    LogTest "STATISTICS" "/dashboard/statistics" "GET" "PASS" "Months: $monthCount"
 } catch {
-    LogTest "STATISTICS" "/statistics" "GET" "FAIL" "$($_.Exception.Message)"
+    LogTest "STATISTICS" "/dashboard/statistics" "GET" "FAIL" "$($_.Exception.Message)"
 }
 
-# 5.3 Logout
-Write-Host "5.3 Logout" -ForegroundColor Cyan
+# 5.3 Get Recent Transactions
+Write-Host "5.3 Get Recent Transactions" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/dashboard/recent-transactions" -Method GET `
+        -Headers $headers -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    $count = if ($data.data.recent_transactions) { $data.data.recent_transactions.Count } else { 0 }
+    LogTest "DASHBOARD" "/dashboard/recent-transactions" "GET" "PASS" "Count: $count"
+} catch {
+    LogTest "DASHBOARD" "/dashboard/recent-transactions" "GET" "FAIL" "$($_.Exception.Message)"
+}
+
+# =====================================================================
+# SECTION 6: SHARED SAVINGS
+# =====================================================================
+
+Write-Host "`n### SECTION 6: SHARED SAVINGS ###`n" -ForegroundColor Yellow
+
+# 6.1 Create Shared Savings
+Write-Host "6.1 Create Shared Savings" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings" -Method POST `
+        -Headers $headers `
+        -Body (@{
+            name = "Trip Bersama $(Get-Random)"
+            description = "Tabungan bersama testing"
+            target_amount = 10000000
+        } | ConvertTo-Json) -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    $script:sharedSavingsId = $data.data.shared_savings.id
+    $script:sharedInviteCode = $data.data.shared_savings.invite_code
+    LogTest "SHARED_SAVINGS" "/shared-savings" "POST" "PASS" "Created: $($data.data.shared_savings.name)"
+} catch {
+    LogTest "SHARED_SAVINGS" "/shared-savings" "POST" "FAIL" "$($_.Exception.Message)"
+}
+
+# 6.2 Get Shared Savings
+Write-Host "6.2 Get Shared Savings" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings" -Method GET `
+        -Headers $headers -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    LogTest "SHARED_SAVINGS" "/shared-savings" "GET" "PASS" "Count: $($data.data.shared_savings.Count)"
+} catch {
+    LogTest "SHARED_SAVINGS" "/shared-savings" "GET" "FAIL" "$($_.Exception.Message)"
+}
+
+# 6.3 Get Shared Savings Detail
+Write-Host "6.3 Get Shared Savings Detail" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId" -Method GET `
+            -Headers $headers -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id" "GET" "PASS" "Name: $($data.data.shared_savings.name)"
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id" "GET" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.4 Join Shared Savings
+Write-Host "6.4 Join Shared Savings" -ForegroundColor Cyan
+if ($sharedInviteCode) {
+    $joinEmail = "join_$(Get-Random)@test.com"
+    $joinPassword = "password123"
+
+    try {
+        $registerJoinUser = Invoke-WebRequest -Uri "$baseUrl/auth/register" -Method POST `
+            -Headers @{"Content-Type"="application/json"} `
+            -Body (@{
+                email = $joinEmail
+                password = $joinPassword
+            } | ConvertTo-Json) -UseBasicParsing
+
+        $loginJoinUser = Invoke-WebRequest -Uri "$baseUrl/auth/login" -Method POST `
+            -Headers @{"Content-Type"="application/json"} `
+            -Body (@{
+                email = $joinEmail
+                password = $joinPassword
+            } | ConvertTo-Json) -UseBasicParsing
+
+        $joinData = $loginJoinUser.Content | ConvertFrom-Json
+        $joinToken = $joinData.data.token
+        $joinHeaders = @{
+            "Authorization" = "Bearer $joinToken"
+            "Content-Type" = "application/json"
+        }
+
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/join" -Method POST `
+            -Headers $joinHeaders `
+            -Body (@{
+                invite_code = $sharedInviteCode
+            } | ConvertTo-Json) -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_SAVINGS" "/shared-savings/join" "POST" "PASS" "Joined with invite code"
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/join" "POST" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.5 Get Shared Savings Members
+Write-Host "6.5 Get Shared Savings Members" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId/members" -Method GET `
+            -Headers $headers -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id/members" "GET" "PASS" "Members: $($data.data.members.Count)"
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id/members" "GET" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.6 Create Shared Transaction
+Write-Host "6.6 Create Shared Transaction" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-transactions" -Method POST `
+            -Headers $headers `
+            -Body (@{
+                shared_savings_id = $sharedSavingsId
+                type = "deposit"
+                amount = 1000000
+                description = "Shared deposit"
+            } | ConvertTo-Json) -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        $script:sharedTransactionId = $data.data.shared_transaction.id
+        LogTest "SHARED_TRANSACTIONS" "/shared-transactions" "POST" "PASS" "Amount: $($data.data.shared_transaction.amount)"
+    } catch {
+        LogTest "SHARED_TRANSACTIONS" "/shared-transactions" "POST" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.7 Get Shared Statistics
+Write-Host "6.7 Get Shared Statistics" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId/statistics" -Method GET `
+            -Headers $headers -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id/statistics" "GET" "PASS" "Members: $($data.data.members.Count)"
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id/statistics" "GET" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.8 Delete Shared Transaction
+Write-Host "6.8 Delete Shared Transaction" -ForegroundColor Cyan
+if ($sharedTransactionId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-transactions/$sharedTransactionId" -Method DELETE `
+            -Headers $headers -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_TRANSACTIONS" "/shared-transactions/:id" "DELETE" "PASS" "Deleted"
+    } catch {
+        LogTest "SHARED_TRANSACTIONS" "/shared-transactions/:id" "DELETE" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.9 Delete Shared Savings
+Write-Host "6.9 Delete Shared Savings" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId" -Method DELETE `
+            -Headers $headers -UseBasicParsing
+        $data = $response.Content | ConvertFrom-Json
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id" "DELETE" "PASS" "Deleted"
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id" "DELETE" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.10 Logout
+Write-Host "6.10 Logout" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/auth/logout" -Method POST `
         -Headers $headers -UseBasicParsing
