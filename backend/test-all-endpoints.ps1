@@ -386,8 +386,37 @@ if ($savingsId) {
     }
 }
 
-# 4.10 Logout
-Write-Host "4.10 Logout" -ForegroundColor Cyan
+# =====================================================================
+# SECTION 5: DASHBOARD & STATISTICS
+# =====================================================================
+
+Write-Host "`n### SECTION 5: DASHBOARD & STATISTICS ###`n" -ForegroundColor Yellow
+
+# 5.1 Get Dashboard
+Write-Host "5.1 Get Dashboard" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/dashboard" -Method GET `
+        -Headers $headers -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    LogTest "DASHBOARD" "/dashboard" "GET" "PASS" "Total savings: $($data.data.dashboard.total_savings)"
+} catch {
+    LogTest "DASHBOARD" "/dashboard" "GET" "FAIL" "$($_.Exception.Message)"
+}
+
+# 5.2 Get Statistics
+Write-Host "5.2 Get Statistics" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/statistics" -Method GET `
+        -Headers $headers -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    $monthCount = if ($data.data.per_month) { $data.data.per_month.Count } else { 0 }
+    LogTest "STATISTICS" "/statistics" "GET" "PASS" "Months: $monthCount"
+} catch {
+    LogTest "STATISTICS" "/statistics" "GET" "FAIL" "$($_.Exception.Message)"
+}
+
+# 5.3 Logout
+Write-Host "5.3 Logout" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/auth/logout" -Method POST `
         -Headers $headers -UseBasicParsing
