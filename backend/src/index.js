@@ -1,15 +1,15 @@
 // index.js
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import 'dotenv/config';
+import swaggerUi from 'swagger-ui-express';
+import swaggerSpec from './docs/swagger.js';
 import authRoutes from "./routes/auth.routes.js";
 import profileRoutes from "./routes/profile.routes.js";
 import savingsRoutes from "./routes/savings.routes.js";
 import transactionRoutes from "./routes/transaction.routes.js";
 import dashboardRoutes from "./routes/dashboard.routes.js";
 import { sharedSavingsRouter, sharedTransactionRouter } from "./routes/sharedSavings.routes.js";
-
-dotenv.config();
 
 const app = express();
 app.use(cors());
@@ -48,6 +48,12 @@ app.use(
 app.use(
     "/api/shared-transactions",
     sharedTransactionRouter
+);
+
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
 );
 
 import errorHandler from "./middlewares/errorHandler.js";
