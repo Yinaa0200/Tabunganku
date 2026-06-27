@@ -1,4 +1,5 @@
 // services/savings.service.js
+import path from "path";
 import { supabase } from "../config/supabase.js";
 import AppError from "../utils/AppError.js";
 
@@ -11,6 +12,48 @@ const ALLOWED_SORT = Object.freeze(["asc", "desc"]);
 // ② Menghilangkan Magic Numbers
 const DEFAULT_LIMIT = 10;
 const MAX_LIMIT = 100;
+
+const extractStoragePathFromUrl = (url, bucketName) => {
+    if (!url || typeof url !== "string") {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(url);
+        const segments = parsedUrl.pathname.split("/").filter(Boolean);
+        const objectIndex = segments.indexOf("object");
+
+        if (objectIndex === -1 || segments[objectIndex + 1] !== "public") {
+            return null;
+        }
+
+        const bucketInUrl = segments[objectIndex + 2];
+        if (bucketInUrl !== bucketName) {
+            return null;
+        }
+
+        return decodeURIComponent(segments.slice(objectIndex + 3).join("/"));
+    } catch {
+        return null;
+    }
+};
+
+const deleteStorageObject = async (bucketName, imageUrl) => {
+    if (!imageUrl) {
+        return;
+    }
+
+    const objectPath = extractStoragePathFromUrl(imageUrl, bucketName);
+    if (!objectPath) {
+        return;
+    }
+
+    try {
+        await supabase.storage.from(bucketName).remove([objectPath]);
+    } catch {
+        // Ignore cleanup errors so the upload flow still succeeds.
+    }
+};
 
 // Private helper - Encapsulated
 const findSavingsOrFail = async (userId, savingsId) => {
@@ -35,8 +78,13 @@ const findSavingsOrFail = async (userId, savingsId) => {
     return data;
 };
 
+const normalizeSavings = (data) => ({
+    ...data,
+    image_url: data?.image_url || null,
+});
+
 export const createSavings = async (userId, payload) => {
-    const { name, target_amount } = payload;
+    const { name, target_amount, image_url } = payload;
 
     // ⑥ Defensive trimming untuk membersihkan whitespace input
     const cleanName = name ? name.trim() : "";
@@ -56,7 +104,8 @@ export const createSavings = async (userId, payload) => {
                 user_id: userId,
                 name: cleanName,
                 target_amount: amount,
-                current_amount: 0
+                current_amount: 0,
+                image_url: image_url || null
             }
         ])
         .select()
@@ -66,7 +115,7 @@ export const createSavings = async (userId, payload) => {
         throw new AppError(error.message, 400);
     }
 
-    return data;
+    return normalizeSavings(data);
 };
 
 export const getSavings = async (userId, queryParams) => {
@@ -107,7 +156,7 @@ export const getSavings = async (userId, queryParams) => {
     }
 
     return {
-        savings: data,
+        savings: (data || []).map(normalizeSavings),
         pagination: {
             total: count,
             page,
@@ -119,13 +168,14 @@ export const getSavings = async (userId, queryParams) => {
 };
 
 export const getSavingsById = async (userId, savingsId) => {
-    return await findSavingsOrFail(userId, savingsId);
+    const data = await findSavingsOrFail(userId, savingsId);
+    return normalizeSavings(data);
 };
 
 export const updateSavings = async (userId, savingsId, payload) => {
     await findSavingsOrFail(userId, savingsId);
 
-    const { name, target_amount } = payload;
+    const { name, target_amount, image_url } = payload;
     const updates = {};
 
     // ⑦ Trimming saat proses update data
@@ -145,6 +195,10 @@ export const updateSavings = async (userId, savingsId, payload) => {
         updates.target_amount = amount;
     }
 
+    if (image_url !== undefined) {
+        updates.image_url = image_url || null;
+    }
+
     const { data, error } = await supabase
         .from(TABLE_NAME)
         .update(updates)
@@ -157,7 +211,55 @@ export const updateSavings = async (userId, savingsId, payload) => {
         throw new AppError(error.message, 400);
     }
 
-    return data;
+    return normalizeSavings(data);
+};
+
+export const uploadSavingsImage = async (userId, savingsId, file) => {
+    if (!file) {
+        throw new AppError("File gambar wajib diunggah.", 400);
+    }
+
+    const savings = await findSavingsOrFail(userId, savingsId);
+    const extension = path.extname(file.originalname) || ".jpg";
+    const safeName = `${userId}/${savingsId}/${Date.now()}${extension}`;
+    const buffer = Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer);
+
+    const { error: bucketError } = await supabase.storage.createBucket("savings-images", {
+        public: true,
+        fileSizeLimit: 2 * 1024 * 1024,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    });
+
+    if (bucketError && !String(bucketError.message).includes("already exists")) {
+        throw new AppError(bucketError.message, 400);
+    }
+
+    const { data, error } = await supabase.storage.from("savings-images").upload(safeName, buffer, {
+        contentType: file.mimetype || "image/jpeg",
+        upsert: true,
+    });
+
+    if (error) {
+        throw new AppError(error.message, 400);
+    }
+
+    const { data: publicData } = supabase.storage.from("savings-images").getPublicUrl(data.path);
+
+    const { data: updated, error: updateError } = await supabase
+        .from(TABLE_NAME)
+        .update({ image_url: publicData.publicUrl })
+        .eq("id", savingsId)
+        .eq("user_id", userId)
+        .select()
+        .single();
+
+    if (updateError) {
+        throw new AppError(updateError.message, 400);
+    }
+
+    await deleteStorageObject("savings-images", savings.image_url);
+
+    return normalizeSavings(updated);
 };
 
 export const deleteSavings = async (userId, savingsId) => {

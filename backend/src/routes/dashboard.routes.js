@@ -2,7 +2,14 @@ import { Router } from "express";
 
 import { requireAuth } from "../middlewares/auth.js";
 import asyncHandler from "../middlewares/asyncHandler.js";
-import { getDashboard, getRecentTransactions, getStatistics } from "../controllers/dashboard.controller.js";
+import validate from "../middlewares/validate.js";
+import {
+    getDashboard,
+    getMonthlySummary,
+    getRecentTransactions,
+    getStatistics,
+} from "../controllers/dashboard.controller.js";
+import { monthlySummaryQuerySchema } from "../validation/dashboard.validation.js";
 
 /**
  * @swagger
@@ -71,6 +78,44 @@ import { getDashboard, getRecentTransactions, getStatistics } from "../controlle
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ * /dashboard/monthly-summary:
+ *   get:
+ *     tags: [Dashboard]
+ *     summary: Get monthly income and expense summary
+ *     description: Retrieve deposit and withdrawal totals for a specific month and optionally a specific savings goal.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: month
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: 2026-05
+ *       - in: query
+ *         name: savings_id
+ *         schema:
+ *           type: string
+ *           example: 11111111-1111-1111-1111-111111111111
+ *     responses:
+ *       200:
+ *         description: Monthly summary retrieved successfully.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/SuccessResponse'
+ *       400:
+ *         description: Validation error.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Unauthorized.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 const router = Router();
 
@@ -90,6 +135,13 @@ router.get(
     "/recent-transactions",
     requireAuth,
     asyncHandler(getRecentTransactions)
+);
+
+router.get(
+    "/monthly-summary",
+    requireAuth,
+    validate(monthlySummaryQuerySchema),
+    asyncHandler(getMonthlySummary)
 );
 
 export default router;

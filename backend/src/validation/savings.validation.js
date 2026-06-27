@@ -8,7 +8,13 @@ export const createSavingsSchema = z.object({
     
     target_amount: z
         .number()
-        .positive("Target tabungan harus lebih dari 0.")
+        .positive("Target tabungan harus lebih dari 0."),
+
+    image_url: z
+        .string()
+        .trim()
+        .url("URL gambar tidak valid.")
+        .optional()
 });
 
 export const updateSavingsSchema = z.object({
@@ -21,6 +27,12 @@ export const updateSavingsSchema = z.object({
     target_amount: z
         .number()
         .positive("Target tabungan harus lebih dari 0.")
+        .optional(),
+
+    image_url: z
+        .string()
+        .trim()
+        .url("URL gambar tidak valid.")
         .optional()
 }).refine(
     data => Object.keys(data).length > 0,

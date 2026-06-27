@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 
 import { requireAuth } from "../middlewares/auth.js";
 import asyncHandler from "../middlewares/asyncHandler.js";
@@ -14,7 +15,8 @@ import {
     getSharedSavingsStatistics,
     joinSharedSavings,
     updateSharedSavings,
-    updateSharedTransaction
+    updateSharedTransaction,
+    uploadSharedSavingsImage
 } from "../controllers/sharedSavings.controller.js";
 import {
     createSharedSavingsSchema,
@@ -336,6 +338,19 @@ import {
 const sharedSavingsRouter = Router();
 const sharedTransactionRouter = Router();
 
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) {
+            cb(null, true);
+            return;
+        }
+
+        cb(new Error("Format file tidak didukung. Gunakan gambar."));
+    },
+});
+
 sharedSavingsRouter.post(
     "/",
     requireAuth,
@@ -355,6 +370,14 @@ sharedSavingsRouter.get(
     requireAuth,
     validate(sharedSavingsParamsSchema, "params"),
     asyncHandler(getSharedSavingsById)
+);
+
+sharedSavingsRouter.post(
+    "/:id/image",
+    requireAuth,
+    validate(sharedSavingsParamsSchema, "params"),
+    upload.single("image"),
+    asyncHandler(uploadSharedSavingsImage)
 );
 
 sharedSavingsRouter.patch(

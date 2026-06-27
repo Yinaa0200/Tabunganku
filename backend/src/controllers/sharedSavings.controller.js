@@ -55,6 +55,20 @@ export const updateSharedSavings = async (req, res) => {
     );
 };
 
+export const uploadSharedSavingsImage = async (req, res) => {
+    const sharedSavings = await sharedSavingsService.uploadSharedSavingsImage(
+        req.user.id,
+        req.validated.params.id,
+        req.file
+    );
+
+    return success(
+        res,
+        "Gambar tabungan bersama berhasil diunggah.",
+        { shared_savings: sharedSavings }
+    );
+};
+
 export const deleteSharedSavings = async (req, res) => {
     await sharedSavingsService.deleteSharedSavings(
         req.user.id,

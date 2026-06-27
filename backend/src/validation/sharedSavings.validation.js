@@ -14,7 +14,13 @@ export const createSharedSavingsSchema = z.object({
 
     target_amount: z
         .coerce.number()
-        .positive("Target tabungan bersama harus lebih dari 0.")
+        .positive("Target tabungan bersama harus lebih dari 0."),
+
+    image_url: z
+        .string()
+        .trim()
+        .url("URL gambar tidak valid.")
+        .optional()
 });
 
 export const updateSharedSavingsSchema = z.object({
@@ -33,6 +39,12 @@ export const updateSharedSavingsSchema = z.object({
     target_amount: z
         .coerce.number()
         .positive("Target tabungan bersama harus lebih dari 0.")
+        .optional(),
+
+    image_url: z
+        .string()
+        .trim()
+        .url("URL gambar tidak valid.")
         .optional()
 }).refine(
     (data) => Object.keys(data).length > 0,

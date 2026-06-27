@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import path from "path";
 
 import { supabase } from "../config/supabase.js";
 import AppError from "../utils/AppError.js";
@@ -10,12 +11,60 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 const ALLOWED_SORT = Object.freeze(["asc", "desc"]);
 
-const findSharedSavingsOrFail = async (sharedSavingsId) => {
-    const { data, error } = await supabase
+const extractStoragePathFromUrl = (url, bucketName) => {
+    if (!url || typeof url !== "string") {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(url);
+        const segments = parsedUrl.pathname.split("/").filter(Boolean);
+        const objectIndex = segments.indexOf("object");
+
+        if (objectIndex === -1 || segments[objectIndex + 1] !== "public") {
+            return null;
+        }
+
+        const bucketInUrl = segments[objectIndex + 2];
+        if (bucketInUrl !== bucketName) {
+            return null;
+        }
+
+        return decodeURIComponent(segments.slice(objectIndex + 3).join("/"));
+    } catch {
+        return null;
+    }
+};
+
+const deleteStorageObject = async (bucketName, imageUrl) => {
+    if (!imageUrl) {
+        return;
+    }
+
+    const objectPath = extractStoragePathFromUrl(imageUrl, bucketName);
+    if (!objectPath) {
+        return;
+    }
+
+    try {
+        await supabase.storage.from(bucketName).remove([objectPath]);
+    } catch {
+        // Ignore cleanup errors so the upload flow still succeeds.
+    }
+};
+
+const findSharedSavingsOrFail = async (sharedSavingsId, options = {}) => {
+    const { allowDeleted = false } = options;
+    let query = supabase
         .from(SHARED_SAVINGS_TABLE)
         .select("*")
-        .eq("id", sharedSavingsId)
-        .maybeSingle();
+        .eq("id", sharedSavingsId);
+
+    if (!allowDeleted) {
+        query = query.eq("status", "active");
+    }
+
+    const { data, error } = await query.maybeSingle();
 
     if (error) {
         throw new AppError(error.message, 500);
@@ -88,6 +137,11 @@ const generateUniqueInviteCode = async () => {
     throw new AppError("Gagal menghasilkan kode undangan yang unik.", 500);
 };
 
+const normalizeSharedSavings = (data) => ({
+    ...data,
+    image_url: data?.image_url || null,
+});
+
 const applySharedTransaction = (currentAmount, type, amount) => {
     if (type === "deposit") {
         return currentAmount + amount;
@@ -137,6 +191,7 @@ export const createSharedSavings = async (userId, payload) => {
                     description: payload.description ?? "",
                     target_amount: payload.target_amount,
                     current_amount: 0,
+                    image_url: payload.image_url || null,
                     invite_code: inviteCode,
                     status: "active"
                 }
@@ -172,7 +227,7 @@ export const createSharedSavings = async (userId, payload) => {
         }
 
         return {
-            shared_savings: sharedSavings,
+            shared_savings: normalizeSharedSavings(sharedSavings),
             member
         };
     } catch (error) {
@@ -218,7 +273,8 @@ export const getSharedSavings = async (userId, queryParams) => {
     let query = supabase
         .from(SHARED_SAVINGS_TABLE)
         .select("*", { count: "exact" })
-        .in("id", savingsIds);
+        .in("id", savingsIds)
+        .eq("status", "active");
 
     if (search) {
         query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
@@ -235,7 +291,7 @@ export const getSharedSavings = async (userId, queryParams) => {
     }
 
     return {
-        shared_savings: data,
+        shared_savings: (data || []).map(normalizeSharedSavings),
         pagination: {
             total: count,
             page,
@@ -249,7 +305,7 @@ export const getSharedSavingsById = async (userId, sharedSavingsId) => {
     const sharedSavings = await findSharedSavingsOrFail(sharedSavingsId);
     await findMemberOrFail(userId, sharedSavings.id);
 
-    return sharedSavings;
+    return normalizeSharedSavings(sharedSavings);
 };
 
 export const updateSharedSavings = async (userId, sharedSavingsId, payload) => {
@@ -274,6 +330,10 @@ export const updateSharedSavings = async (userId, sharedSavingsId, payload) => {
         updatePayload.target_amount = payload.target_amount;
     }
 
+    if (payload.image_url !== undefined) {
+        updatePayload.image_url = payload.image_url || null;
+    }
+
     const { data, error } = await supabase
         .from(SHARED_SAVINGS_TABLE)
         .update(updatePayload)
@@ -285,11 +345,64 @@ export const updateSharedSavings = async (userId, sharedSavingsId, payload) => {
         throw new AppError(error.message, 400);
     }
 
-    return data;
+    return normalizeSharedSavings(data);
+};
+
+export const uploadSharedSavingsImage = async (userId, sharedSavingsId, file) => {
+    if (!file) {
+        throw new AppError("File gambar wajib diunggah.", 400);
+    }
+
+    const sharedSavings = await findSharedSavingsOrFail(sharedSavingsId);
+    const member = await findMemberOrFail(userId, sharedSavings.id);
+
+    if (member.role !== "owner") {
+        throw new AppError("Hanya owner yang dapat mengubah gambar tabungan bersama.", 403);
+    }
+
+    const extension = path.extname(file.originalname) || ".jpg";
+    const safeName = `${userId}/${sharedSavingsId}/${Date.now()}${extension}`;
+    const buffer = Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer);
+
+    const { error: bucketError } = await supabase.storage.createBucket("shared-savings-images", {
+        public: true,
+        fileSizeLimit: 2 * 1024 * 1024,
+        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+    });
+
+    if (bucketError && !String(bucketError.message).includes("already exists")) {
+        throw new AppError(bucketError.message, 400);
+    }
+
+    const { data, error } = await supabase.storage.from("shared-savings-images").upload(safeName, buffer, {
+        contentType: file.mimetype || "image/jpeg",
+        upsert: true,
+    });
+
+    if (error) {
+        throw new AppError(error.message, 400);
+    }
+
+    const { data: publicData } = supabase.storage.from("shared-savings-images").getPublicUrl(data.path);
+
+    const { data: updated, error: updateError } = await supabase
+        .from(SHARED_SAVINGS_TABLE)
+        .update({ image_url: publicData.publicUrl })
+        .eq("id", sharedSavings.id)
+        .select()
+        .single();
+
+    if (updateError) {
+        throw new AppError(updateError.message, 400);
+    }
+
+    await deleteStorageObject("shared-savings-images", sharedSavings.image_url);
+
+    return normalizeSharedSavings(updated);
 };
 
 export const deleteSharedSavings = async (userId, sharedSavingsId) => {
-    const sharedSavings = await findSharedSavingsOrFail(sharedSavingsId);
+    const sharedSavings = await findSharedSavingsOrFail(sharedSavingsId, { allowDeleted: true });
     const member = await findMemberOrFail(userId, sharedSavings.id);
 
     if (member.role !== "owner") {
@@ -316,7 +429,10 @@ export const deleteSharedSavings = async (userId, sharedSavingsId) => {
 
     const { error: savingsDeleteError } = await supabase
         .from(SHARED_SAVINGS_TABLE)
-        .delete()
+        .update({
+            status: "deleted",
+            invite_code: null
+        })
         .eq("id", sharedSavings.id);
 
     if (savingsDeleteError) {
@@ -333,6 +449,7 @@ export const joinSharedSavings = async (userId, payload) => {
         .from(SHARED_SAVINGS_TABLE)
         .select("*")
         .eq("invite_code", payload.invite_code)
+        .eq("status", "active")
         .maybeSingle();
 
     if (sharedSavingsError) {

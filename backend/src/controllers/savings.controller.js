@@ -58,6 +58,20 @@ export const updateSavings = async (req, res) => {
     );
 };
 
+export const uploadSavingsImage = async (req, res) => {
+    const savings = await savingsService.uploadSavingsImage(
+        req.user.id,
+        req.validated.params.id,
+        req.file
+    );
+
+    return success(
+        res,
+        "Gambar tabungan berhasil diunggah.",
+        { savings }
+    );
+};
+
 export const deleteSavings = async (req, res) => {
     await savingsService.deleteSavings(
         req.user.id,

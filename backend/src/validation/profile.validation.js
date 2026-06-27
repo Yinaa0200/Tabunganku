@@ -9,7 +9,8 @@ export const updateProfileSchema = z.object({
     
     avatar: z
         .string()
-        .url("Avatar harus berupa URL yang valid.")
+        .trim()
+        .min(1, "Avatar tidak boleh kosong.")
         .optional(),
     
     username: z

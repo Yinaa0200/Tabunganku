@@ -1,7 +1,7 @@
 # Comprehensive API Test Checklist
 # Tests all endpoints systematically
 
-$baseUrl = "http://localhost:5000/api"
+$baseUrl = if ($env:API_BASE_URL) { $env:API_BASE_URL.TrimEnd('/') } else { "https://tabungan-iki-ina.vercel.app/api" }
 $testLog = @()
 $token = $null
 $refreshToken = $null
@@ -10,6 +10,10 @@ $transactionId = $null
 $sharedSavingsId = $null
 $sharedTransactionId = $null
 $sharedInviteCode = $null
+
+$testImagePath = Join-Path $env:TEMP "tabunganku-test-image.png"
+$pngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAIAAeIhvAAAAAElFTkSuQmCC"
+[System.IO.File]::WriteAllBytes($testImagePath, [System.Convert]::FromBase64String($pngBase64))
 
 function LogTest {
     param(
@@ -33,6 +37,34 @@ function LogTest {
     $color = if ($status -eq "PASS") { "Green" } else { "Red" }
     
     Write-Host "$icon $category >> $method $endpoint >> $message" -ForegroundColor $color
+}
+
+function Invoke-MultipartUpload {
+    param(
+        [string]$Uri,
+        [string]$Token,
+        [string]$FieldName,
+        [string]$FilePath
+    )
+
+    $curlArgs = @(
+        '-sS',
+        '-f',
+        '-X', 'POST',
+        $Uri,
+        '-H', "Authorization: Bearer $Token",
+        '-F', "$FieldName=@$FilePath;type=image/png"
+    )
+
+    $rawOutput = & curl.exe @curlArgs 2>$null
+    $exitCode = $LASTEXITCODE
+    $body = if ($null -ne $rawOutput) { ($rawOutput | Out-String).Trim() } else { "" }
+
+    return [pscustomobject]@{
+        Success = ($exitCode -eq 0)
+        ExitCode = $exitCode
+        Body = $body
+    }
 }
 
 Write-Host "`n========== COMPREHENSIVE API TEST SUITE ==========" -ForegroundColor Cyan
@@ -141,8 +173,21 @@ try {
     LogTest "PROFILE" "/profile" "PUT" "FAIL" "$($_.Exception.Message)"
 }
 
-# 2.3 Change Password
-Write-Host "2.3 Change Password" -ForegroundColor Cyan
+# 2.3 Upload Profile Avatar
+Write-Host "2.3 Upload Profile Avatar" -ForegroundColor Cyan
+try {
+    $uploadResult = Invoke-MultipartUpload -Uri "$baseUrl/profile/avatar" -Token $token -FieldName "avatar" -FilePath $testImagePath
+    if ($uploadResult.Success) {
+        LogTest "PROFILE" "/profile/avatar" "POST" "PASS" "Avatar uploaded"
+    } else {
+        LogTest "PROFILE" "/profile/avatar" "POST" "FAIL" "Exit code: $($uploadResult.ExitCode)"
+    }
+} catch {
+    LogTest "PROFILE" "/profile/avatar" "POST" "FAIL" "$($_.Exception.Message)"
+}
+
+# 2.4 Change Password
+Write-Host "2.4 Change Password" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/profile/password" -Method PUT `
         -Headers $headers `
@@ -156,8 +201,8 @@ try {
     LogTest "PROFILE" "/profile/password" "PUT" "FAIL" "$($_.Exception.Message)"
 }
 
-# 2.4 Re-login after Password Change
-Write-Host "2.4 Re-login after password change" -ForegroundColor Cyan
+# 2.5 Re-login after Password Change
+Write-Host "2.5 Re-login after password change" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/auth/login" -Method POST `
         -Headers @{"Content-Type"="application/json"} `
@@ -198,8 +243,23 @@ try {
     LogTest "SAVINGS" "/savings" "POST" "FAIL" "$($_.Exception.Message)"
 }
 
-# 3.2 Get All Savings
-Write-Host "3.2 Get All Savings" -ForegroundColor Cyan
+# 3.2 Upload Savings Image
+Write-Host "3.2 Upload Savings Image" -ForegroundColor Cyan
+if ($savingsId) {
+    try {
+        $uploadResult = Invoke-MultipartUpload -Uri "$baseUrl/savings/$savingsId/image" -Token $token -FieldName "image" -FilePath $testImagePath
+        if ($uploadResult.Success) {
+            LogTest "SAVINGS" "/savings/:id/image" "POST" "PASS" "Image uploaded"
+        } else {
+            LogTest "SAVINGS" "/savings/:id/image" "POST" "FAIL" "Exit code: $($uploadResult.ExitCode)"
+        }
+    } catch {
+        LogTest "SAVINGS" "/savings/:id/image" "POST" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 3.3 Get All Savings
+Write-Host "3.3 Get All Savings" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/savings" -Method GET `
         -Headers $headers -UseBasicParsing
@@ -209,8 +269,8 @@ try {
     LogTest "SAVINGS" "/savings" "GET" "FAIL" "$($_.Exception.Message)"
 }
 
-# 3.3 Search Savings
-Write-Host "3.3 Search Savings" -ForegroundColor Cyan
+# 3.4 Search Savings
+Write-Host "3.4 Search Savings" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/savings?search=Liburan" -Method GET `
         -Headers $headers -UseBasicParsing
@@ -220,8 +280,8 @@ try {
     LogTest "SAVINGS" "/savings?search=..." "GET" "FAIL" "$($_.Exception.Message)"
 }
 
-# 3.4 Pagination
-Write-Host "3.4 Pagination" -ForegroundColor Cyan
+# 3.5 Pagination
+Write-Host "3.5 Pagination" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/savings?page=1&limit=5" -Method GET `
         -Headers $headers -UseBasicParsing
@@ -233,8 +293,8 @@ try {
     LogTest "SAVINGS" "/savings?page=1&limit=5" "GET" "FAIL" "$($_.Exception.Message)"
 }
 
-# 3.5 Get Savings Detail
-Write-Host "3.5 Get Savings Detail" -ForegroundColor Cyan
+# 3.6 Get Savings Detail
+Write-Host "3.6 Get Savings Detail" -ForegroundColor Cyan
 if ($savingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/savings/$savingsId" -Method GET `
@@ -246,8 +306,8 @@ if ($savingsId) {
     }
 }
 
-# 3.6 Update Savings
-Write-Host "3.6 Update Savings" -ForegroundColor Cyan
+# 3.7 Update Savings
+Write-Host "3.7 Update Savings" -ForegroundColor Cyan
 if ($savingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/savings/$savingsId" -Method PUT `
@@ -430,6 +490,18 @@ try {
     LogTest "DASHBOARD" "/dashboard/recent-transactions" "GET" "FAIL" "$($_.Exception.Message)"
 }
 
+# 5.4 Get Monthly Summary
+Write-Host "5.4 Get Monthly Summary" -ForegroundColor Cyan
+try {
+    $response = Invoke-WebRequest -Uri "$baseUrl/dashboard/monthly-summary?month=2026-05" -Method GET `
+        -Headers $headers -UseBasicParsing
+    $data = $response.Content | ConvertFrom-Json
+    $deposit = if ($data.data.totals.deposit) { $data.data.totals.deposit } else { 0 }
+    LogTest "DASHBOARD" "/dashboard/monthly-summary" "GET" "PASS" "Deposit: $deposit"
+} catch {
+    LogTest "DASHBOARD" "/dashboard/monthly-summary" "GET" "FAIL" "$($_.Exception.Message)"
+}
+
 # =====================================================================
 # SECTION 6: SHARED SAVINGS
 # =====================================================================
@@ -465,8 +537,23 @@ try {
     LogTest "SHARED_SAVINGS" "/shared-savings" "GET" "FAIL" "$($_.Exception.Message)"
 }
 
-# 6.3 Get Shared Savings Detail
-Write-Host "6.3 Get Shared Savings Detail" -ForegroundColor Cyan
+# 6.3 Upload Shared Savings Image
+Write-Host "6.3 Upload Shared Savings Image" -ForegroundColor Cyan
+if ($sharedSavingsId) {
+    try {
+        $uploadResult = Invoke-MultipartUpload -Uri "$baseUrl/shared-savings/$sharedSavingsId/image" -Token $token -FieldName "image" -FilePath $testImagePath
+        if ($uploadResult.Success) {
+            LogTest "SHARED_SAVINGS" "/shared-savings/:id/image" "POST" "PASS" "Image uploaded"
+        } else {
+            LogTest "SHARED_SAVINGS" "/shared-savings/:id/image" "POST" "FAIL" "Exit code: $($uploadResult.ExitCode)"
+        }
+    } catch {
+        LogTest "SHARED_SAVINGS" "/shared-savings/:id/image" "POST" "FAIL" "$($_.Exception.Message)"
+    }
+}
+
+# 6.4 Get Shared Savings Detail
+Write-Host "6.4 Get Shared Savings Detail" -ForegroundColor Cyan
 if ($sharedSavingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId" -Method GET `
@@ -478,8 +565,8 @@ if ($sharedSavingsId) {
     }
 }
 
-# 6.4 Join Shared Savings
-Write-Host "6.4 Join Shared Savings" -ForegroundColor Cyan
+# 6.5 Join Shared Savings
+Write-Host "6.5 Join Shared Savings" -ForegroundColor Cyan
 if ($sharedInviteCode) {
     $joinEmail = "join_$(Get-Random)@test.com"
     $joinPassword = "password123"
@@ -518,8 +605,8 @@ if ($sharedInviteCode) {
     }
 }
 
-# 6.5 Get Shared Savings Members
-Write-Host "6.5 Get Shared Savings Members" -ForegroundColor Cyan
+# 6.6 Get Shared Savings Members
+Write-Host "6.6 Get Shared Savings Members" -ForegroundColor Cyan
 if ($sharedSavingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId/members" -Method GET `
@@ -531,8 +618,8 @@ if ($sharedSavingsId) {
     }
 }
 
-# 6.6 Create Shared Transaction
-Write-Host "6.6 Create Shared Transaction" -ForegroundColor Cyan
+# 6.7 Create Shared Transaction
+Write-Host "6.7 Create Shared Transaction" -ForegroundColor Cyan
 if ($sharedSavingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-transactions" -Method POST `
@@ -551,8 +638,8 @@ if ($sharedSavingsId) {
     }
 }
 
-# 6.7 Get Shared Statistics
-Write-Host "6.7 Get Shared Statistics" -ForegroundColor Cyan
+# 6.8 Get Shared Statistics
+Write-Host "6.8 Get Shared Statistics" -ForegroundColor Cyan
 if ($sharedSavingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId/statistics" -Method GET `
@@ -564,8 +651,8 @@ if ($sharedSavingsId) {
     }
 }
 
-# 6.8 Delete Shared Transaction
-Write-Host "6.8 Delete Shared Transaction" -ForegroundColor Cyan
+# 6.9 Delete Shared Transaction
+Write-Host "6.9 Delete Shared Transaction" -ForegroundColor Cyan
 if ($sharedTransactionId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-transactions/$sharedTransactionId" -Method DELETE `
@@ -577,8 +664,8 @@ if ($sharedTransactionId) {
     }
 }
 
-# 6.9 Delete Shared Savings
-Write-Host "6.9 Delete Shared Savings" -ForegroundColor Cyan
+# 6.10 Delete Shared Savings
+Write-Host "6.10 Delete Shared Savings" -ForegroundColor Cyan
 if ($sharedSavingsId) {
     try {
         $response = Invoke-WebRequest -Uri "$baseUrl/shared-savings/$sharedSavingsId" -Method DELETE `
@@ -590,8 +677,8 @@ if ($sharedSavingsId) {
     }
 }
 
-# 6.10 Logout
-Write-Host "6.10 Logout" -ForegroundColor Cyan
+# 6.11 Logout
+Write-Host "6.11 Logout" -ForegroundColor Cyan
 try {
     $response = Invoke-WebRequest -Uri "$baseUrl/auth/logout" -Method POST `
         -Headers $headers -UseBasicParsing

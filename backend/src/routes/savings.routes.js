@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 
 import { requireAuth } from "../middlewares/auth.js";
 
@@ -11,6 +12,7 @@ import {
     getSavings,
     getSavingsById,
     updateSavings,
+    uploadSavingsImage,
     deleteSavings,
     getTransactionsBySavingsId
 } from "../controllers/savings.controller.js";
@@ -231,6 +233,19 @@ import { transactionQuerySchema, transactionParamsSchema } from "../validation/t
  */
 const router = Router();
 
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) {
+            cb(null, true);
+            return;
+        }
+
+        cb(new Error("Format file tidak didukung. Gunakan gambar."));
+    },
+});
+
 router.post(
     "/",
     requireAuth,
@@ -250,6 +265,14 @@ router.get(
     requireAuth,
     validate(savingsParamsSchema, "params"),
     asyncHandler(getSavingsById)
+);
+
+router.post(
+    "/:id/image",
+    requireAuth,
+    validate(savingsParamsSchema, "params"),
+    upload.single("image"),
+    asyncHandler(uploadSavingsImage)
 );
 
 router.get(

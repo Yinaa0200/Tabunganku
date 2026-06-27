@@ -1,9 +1,11 @@
 import { Router } from "express";
+import multer from "multer";
 import validate from "../middlewares/validate.js";
 import {
     getProfile,
     updateProfile,
-    changePassword
+    changePassword,
+    uploadAvatar
 } from "../controllers/profile.controller.js";
 import {
     updateProfileSchema,
@@ -11,6 +13,19 @@ import {
 } from "../validation/profile.validation.js";
 import { requireAuth } from "../middlewares/auth.js";
 import asyncHandler from "../middlewares/asyncHandler.js";
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+        if (file.mimetype.startsWith("image/")) {
+            cb(null, true);
+            return;
+        }
+
+        cb(new Error("Format file tidak didukung. Gunakan gambar."));
+    },
+});
 
 /**
  * @swagger
@@ -111,6 +126,13 @@ router.put(
     requireAuth,
     validate(updateProfileSchema),
     asyncHandler(updateProfile)
+);
+
+router.post(
+    "/avatar",
+    requireAuth,
+    upload.single("avatar"),
+    asyncHandler(uploadAvatar)
 );
 
 router.put(

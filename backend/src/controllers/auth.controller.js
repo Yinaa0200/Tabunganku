@@ -2,18 +2,74 @@ import { supabase } from "../config/supabase.js";
 import { success } from "../utils/response.js";
 import AppError from "../utils/AppError.js";
 
+const buildUserPayload = (user, profile = {}) => ({
+    id: user.id,
+    email: user.email,
+    name: profile.full_name || user.user_metadata?.full_name || user.user_metadata?.name || null,
+    username: profile.username || user.user_metadata?.username || null,
+    avatar: profile.avatar_url || user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+});
+
+const ensureProfile = async (userId, profileData = {}) => {
+    if (!userId) return null;
+
+    const { error } = await supabase
+        .from("profiles")
+        .upsert(
+            {
+                id: userId,
+                ...profileData,
+                updated_at: new Date().toISOString(),
+            },
+            { onConflict: "id" }
+        );
+
+    if (error) {
+        throw new AppError(`Gagal menyimpan profil: ${error.message}`, 400);
+    }
+
+    return profileData;
+};
+
 export const register = async (req, res) => {
+    const { email, password, name, username, avatar } = req.validated.body;
+
     const { data, error } = await supabase.auth.signUp({
-        email: req.validated.body.email,
-        password: req.validated.body.password,
+        email,
+        password,
+        options: {
+            data: {
+                full_name: name,
+                name,
+                username: username || null,
+                avatar_url: avatar || null,
+            },
+        },
     });
 
     if (error) throw new AppError(error.message, 400);
 
+    if (data?.user) {
+        await ensureProfile(data.user.id, {
+            full_name: name,
+            username: username || null,
+            avatar_url: avatar || null,
+        });
+    }
+
     return success(
         res,
         "Registrasi berhasil! Silakan cek email Anda untuk verifikasi.",
-        data,
+        {
+            user: data?.user
+                ? buildUserPayload(data.user, {
+                    full_name: name,
+                    username: username || null,
+                    avatar_url: avatar || null,
+                })
+                : null,
+            session: data.session,
+        },
         201
     );
 };
@@ -26,13 +82,19 @@ export const login = async (req, res) => {
 
     if (error) throw new AppError(error.message, 401);
 
+    const { data: profileData } = await supabase
+        .from("profiles")
+        .select("full_name, username, avatar_url")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
     return success(
         res,
         "Login sukses!",
         {
             token: data.session?.access_token,
             refresh_token: data.session?.refresh_token,
-            user: data.user
+            user: buildUserPayload(data.user, profileData || {}),
         }
     );
 };
