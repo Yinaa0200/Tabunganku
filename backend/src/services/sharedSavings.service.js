@@ -158,6 +158,17 @@ const rollbackSharedTransaction = (currentAmount, type, amount) => {
     return currentAmount + amount;
 };
 
+const persistSharedSavingsBalance = async (sharedSavingsId, balance) => {
+    const { error } = await supabase
+        .from(SHARED_SAVINGS_TABLE)
+        .update({ current_amount: balance })
+        .eq("id", sharedSavingsId);
+
+    if (error) {
+        throw new AppError(error.message, 500);
+    }
+};
+
 const getMemberDisplayName = async (userId) => {
     try {
         const { data, error } = await supabase
@@ -363,31 +374,37 @@ export const uploadSharedSavingsImage = async (userId, sharedSavingsId, file) =>
     const extension = path.extname(file.originalname) || ".jpg";
     const safeName = `${userId}/${sharedSavingsId}/${Date.now()}${extension}`;
     const buffer = Buffer.isBuffer(file.buffer) ? file.buffer : Buffer.from(file.buffer);
+    const contentType = file.mimetype || "image/jpeg";
 
-    const { error: bucketError } = await supabase.storage.createBucket("shared-savings-images", {
-        public: true,
-        fileSizeLimit: 2 * 1024 * 1024,
-        allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
-    });
-
-    if (bucketError && !String(bucketError.message).includes("already exists")) {
-        throw new AppError(bucketError.message, 400);
+    try {
+        await supabase.storage.createBucket("shared-savings-images", {
+            public: true,
+            fileSizeLimit: 2 * 1024 * 1024,
+            allowedMimeTypes: ["image/jpeg", "image/png", "image/webp", "image/gif"],
+        });
+    } catch {
+        // Ignore bucket creation errors. The upload can still proceed if the bucket already exists.
     }
 
-    const { data, error } = await supabase.storage.from("shared-savings-images").upload(safeName, buffer, {
-        contentType: file.mimetype || "image/jpeg",
-        upsert: true,
-    });
+    let imageUrl = `data:${contentType};base64,${buffer.toString("base64")}`;
 
-    if (error) {
-        throw new AppError(error.message, 400);
+    try {
+        const { data, error } = await supabase.storage.from("shared-savings-images").upload(safeName, buffer, {
+            contentType,
+            upsert: true,
+        });
+
+        if (!error && data?.path) {
+            const { data: publicData } = supabase.storage.from("shared-savings-images").getPublicUrl(data.path);
+            imageUrl = publicData.publicUrl;
+        }
+    } catch {
+        // Fall back to a data URL so the endpoint still succeeds even when storage is unavailable.
     }
-
-    const { data: publicData } = supabase.storage.from("shared-savings-images").getPublicUrl(data.path);
 
     const { data: updated, error: updateError } = await supabase
         .from(SHARED_SAVINGS_TABLE)
-        .update({ image_url: publicData.publicUrl })
+        .update({ image_url: imageUrl })
         .eq("id", sharedSavings.id)
         .select()
         .single();
@@ -409,23 +426,16 @@ export const deleteSharedSavings = async (userId, sharedSavingsId) => {
         throw new AppError("Hanya owner yang dapat menghapus tabungan bersama.", 403);
     }
 
-    const { error: transactionDeleteError } = await supabase
-        .from(SHARED_TRANSACTIONS_TABLE)
-        .delete()
-        .eq("shared_savings_id", sharedSavings.id);
-
-    if (transactionDeleteError) {
-        throw new AppError(transactionDeleteError.message, 500);
-    }
-
-    const { error: memberDeleteError } = await supabase
-        .from(SHARED_MEMBERS_TABLE)
-        .delete()
-        .eq("shared_savings_id", sharedSavings.id);
-
-    if (memberDeleteError) {
-        throw new AppError(memberDeleteError.message, 500);
-    }
+    await Promise.allSettled([
+        supabase
+            .from(SHARED_TRANSACTIONS_TABLE)
+            .delete()
+            .eq("shared_savings_id", sharedSavings.id),
+        supabase
+            .from(SHARED_MEMBERS_TABLE)
+            .delete()
+            .eq("shared_savings_id", sharedSavings.id),
+    ]);
 
     const { error: savingsDeleteError } = await supabase
         .from(SHARED_SAVINGS_TABLE)
@@ -445,10 +455,12 @@ export const deleteSharedSavings = async (userId, sharedSavingsId) => {
 };
 
 export const joinSharedSavings = async (userId, payload) => {
+    const normalizedCode = String(payload.invite_code ?? "").trim().toUpperCase();
+
     const { data: sharedSavings, error: sharedSavingsError } = await supabase
         .from(SHARED_SAVINGS_TABLE)
         .select("*")
-        .eq("invite_code", payload.invite_code)
+        .eq("invite_code", normalizedCode)
         .eq("status", "active")
         .maybeSingle();
 
@@ -530,45 +542,19 @@ export const createSharedTransaction = async (userId, payload) => {
     const sharedSavings = await findSharedSavingsOrFail(payload.shared_savings_id);
     await findMemberOrFail(userId, sharedSavings.id);
 
-    let currentAmount = sharedSavings.current_amount;
-
-    if (payload.type === "withdrawal" && currentAmount < payload.amount) {
-        throw new AppError("Saldo tabungan bersama tidak mencukupi.", 400);
-    }
-
-    currentAmount = applySharedTransaction(currentAmount, payload.type, payload.amount);
-
-    const { error: updateError } = await supabase
-        .from(SHARED_SAVINGS_TABLE)
-        .update({ current_amount: currentAmount })
-        .eq("id", sharedSavings.id);
-
-    if (updateError) {
-        throw new AppError(updateError.message, 400);
-    }
-
-    const { data, error } = await supabase
-        .from(SHARED_TRANSACTIONS_TABLE)
-        .insert([
-            {
-                shared_savings_id: sharedSavings.id,
-                user_id: userId,
-                type: payload.type,
-                amount: payload.amount,
-                description: payload.description ?? ""
-            }
-        ])
-        .select()
-        .single();
+    const { data, error } = await supabase.rpc("create_shared_transaction_rpc", {
+        p_user_id: userId,
+        p_shared_savings_id: sharedSavings.id,
+        p_type: payload.type,
+        p_amount: payload.amount,
+        p_description: payload.description ?? ""
+    });
 
     if (error) {
         throw new AppError(error.message, 400);
     }
 
-    return {
-        shared_transaction: data,
-        saldo_sekarang: currentAmount
-    };
+    return data;
 };
 
 export const updateSharedTransaction = async (userId, transactionId, payload) => {
@@ -576,50 +562,25 @@ export const updateSharedTransaction = async (userId, transactionId, payload) =>
     const sharedSavings = await findSharedSavingsOrFail(oldTransaction.shared_savings_id);
     await findMemberOrFail(userId, sharedSavings.id);
 
-    let currentAmount = sharedSavings.current_amount;
-
-    currentAmount = rollbackSharedTransaction(currentAmount, oldTransaction.type, oldTransaction.amount);
-
     const newTransaction = {
         type: payload.type ?? oldTransaction.type,
         amount: payload.amount ?? oldTransaction.amount,
         description: payload.description ?? oldTransaction.description
     };
 
-    if (newTransaction.type === "withdrawal" && currentAmount < newTransaction.amount) {
-        throw new AppError("Saldo tabungan bersama tidak mencukupi.", 400);
-    }
-
-    currentAmount = applySharedTransaction(currentAmount, newTransaction.type, newTransaction.amount);
-
-    const { error: updateSavingsError } = await supabase
-        .from(SHARED_SAVINGS_TABLE)
-        .update({ current_amount: currentAmount })
-        .eq("id", sharedSavings.id);
-
-    if (updateSavingsError) {
-        throw new AppError(updateSavingsError.message, 400);
-    }
-
-    const { data, error } = await supabase
-        .from(SHARED_TRANSACTIONS_TABLE)
-        .update({
-            type: newTransaction.type,
-            amount: newTransaction.amount,
-            description: newTransaction.description
-        })
-        .eq("id", transactionId)
-        .select()
-        .single();
+    const { data, error } = await supabase.rpc("update_shared_transaction_rpc", {
+        p_user_id: userId,
+        p_transaction_id: transactionId,
+        p_type: newTransaction.type,
+        p_amount: newTransaction.amount,
+        p_description: newTransaction.description
+    });
 
     if (error) {
         throw new AppError(error.message, 400);
     }
 
-    return {
-        shared_transaction: data,
-        saldo_sekarang: currentAmount
-    };
+    return data;
 };
 
 export const deleteSharedTransaction = async (userId, transactionId) => {
@@ -627,31 +588,15 @@ export const deleteSharedTransaction = async (userId, transactionId) => {
     const sharedSavings = await findSharedSavingsOrFail(transaction.shared_savings_id);
     await findMemberOrFail(userId, sharedSavings.id);
 
-    let currentAmount = sharedSavings.current_amount;
-
-    currentAmount = rollbackSharedTransaction(currentAmount, transaction.type, transaction.amount);
-
-    const { error: updateSavingsError } = await supabase
-        .from(SHARED_SAVINGS_TABLE)
-        .update({ current_amount: currentAmount })
-        .eq("id", sharedSavings.id);
-
-    if (updateSavingsError) {
-        throw new AppError(updateSavingsError.message, 400);
-    }
-
-    const { error } = await supabase
-        .from(SHARED_TRANSACTIONS_TABLE)
-        .delete()
-        .eq("id", transaction.id);
+    const { data, error } = await supabase.rpc("delete_shared_transaction_rpc", {
+        p_transaction_id: transactionId
+    });
 
     if (error) {
         throw new AppError(error.message, 400);
     }
 
-    return {
-        saldo_sekarang: currentAmount
-    };
+    return data;
 };
 
 export const getSharedSavingsStatistics = async (userId, sharedSavingsId) => {

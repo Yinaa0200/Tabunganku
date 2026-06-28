@@ -1,5 +1,5 @@
 // middleware/auth.js
-import { supabase } from '../config/supabase.js';
+import { createSupabaseClientWithToken, supabase } from '../config/supabase.js';
 
 export const requireAuth = async (req, res, next) => {
   // 1. Ambil header Authorization dari request
@@ -30,13 +30,9 @@ export const requireAuth = async (req, res, next) => {
     // Ini sangat berguna agar controller kita tahu SIAPA user yang sedang mengakses
     req.user = user;
     req.token = token; // Simpan token untuk digunakan di endpoint yang butuh session
-    
-    // 7. Set session agar supabase.auth.updateUser() bekerja
-    await supabase.auth.setSession({
-      access_token: token
-    });
+    req.supabase = createSupabaseClientWithToken(token);
 
-    // 8. Lanjutkan ke proses berikutnya (Controller / Route)
+    // 7. Lanjutkan ke proses berikutnya (Controller / Route)
     next();
   } catch (err) {
     return res.status(500).json({ error: 'Terjadi kesalahan pada server internal.' });

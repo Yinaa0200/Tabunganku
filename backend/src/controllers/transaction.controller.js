@@ -4,7 +4,7 @@ import { success } from "../utils/response.js";
 export const createTransaction = async (req, res) => {
     const result = await transactionService.createTransaction(
         req.user.id,
-        req.body
+        req.validated.body
     );
 
     return success(

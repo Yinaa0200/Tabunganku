@@ -140,7 +140,7 @@ router.get(
 router.get(
     "/monthly-summary",
     requireAuth,
-    validate(monthlySummaryQuerySchema),
+    validate(monthlySummaryQuerySchema, "query"),
     asyncHandler(getMonthlySummary)
 );
 

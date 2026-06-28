@@ -1,5 +1,5 @@
 import path from "path";
-import { supabase } from "../config/supabase.js";
+import { createSupabaseClientWithToken, supabase } from "../config/supabase.js";
 import { success } from "../utils/response.js";
 import AppError from "../utils/AppError.js";
 
@@ -75,6 +75,49 @@ const syncProfileRecord = async (userId, profileData = {}) => {
     return profileData;
 };
 
+const updateAuthProfileMetadata = async (userId, updates, accessToken) => {
+    const metadata = {};
+
+    if (updates.full_name !== undefined) {
+        metadata.full_name = updates.full_name;
+        metadata.name = updates.full_name;
+    }
+
+    if (updates.username !== undefined) {
+        metadata.username = updates.username;
+    }
+
+    if (updates.avatar_url !== undefined) {
+        metadata.avatar_url = updates.avatar_url;
+    }
+
+    if (!Object.keys(metadata).length) {
+        return;
+    }
+
+    if (typeof supabase.auth.admin?.updateUserById === "function") {
+        const { error } = await supabase.auth.admin.updateUserById(userId, {
+            user_metadata: metadata,
+        });
+
+        if (error) {
+            throw new AppError(error.message, 400);
+        }
+
+        return;
+    }
+
+    const client = accessToken ? createSupabaseClientWithToken(accessToken) : supabase;
+
+    const { error } = await client.auth.updateUser({
+        data: metadata,
+    });
+
+    if (error) {
+        throw new AppError(error.message, 400);
+    }
+};
+
 export const getProfile = async (req, res) => {
     const { data, error } = await supabase
         .from("profiles")
@@ -109,17 +152,7 @@ export const updateProfile = async (req, res) => {
     }
 
     if (Object.keys(updates).length > 0) {
-        const { error: authError } = await supabase.auth.updateUser({
-            data: {
-                full_name: updates.full_name,
-                name: updates.full_name,
-                username: updates.username,
-                avatar_url: updates.avatar_url,
-            },
-        });
-
-        if (authError) throw new AppError(authError.message, 400);
-
+        await updateAuthProfileMetadata(req.user.id, updates, req.token);
         await syncProfileRecord(req.user.id, updates);
     }
 
