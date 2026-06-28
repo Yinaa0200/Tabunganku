@@ -52,9 +52,12 @@ export const transactionQuerySchema = z.object({
 
 });
 
+// PERBAIKAN BUG #4 (sisa): id juga harus z.string().uuid(), konsisten dengan
+// createTransactionSchema dan seluruh params schema lain di codebase.
 export const transactionParamsSchema = z.object({
 
     id: z
+        .string()
         .uuid("ID transaksi tidak valid.")
 
 });

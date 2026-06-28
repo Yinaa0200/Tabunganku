@@ -95,19 +95,16 @@ const updateAuthProfileMetadata = async (userId, updates, accessToken) => {
         return;
     }
 
-    if (typeof supabase.auth.admin?.updateUserById === "function") {
-        const { error } = await supabase.auth.admin.updateUserById(userId, {
-            user_metadata: metadata,
-        });
-
-        if (error) {
-            throw new AppError(error.message, 400);
-        }
-
-        return;
+    // Selalu pakai token user untuk updateUser().
+    // supabase.auth.admin.updateUserById() membutuhkan service_role key yang dikonfigurasi
+    // secara spesifik — tidak selalu tersedia. Fallback ke supabase (tanpa token)
+    // akan gagal dengan "This endpoint requires a valid Bearer token".
+    // Solusi: selalu buat client dengan accessToken user yang sudah terverifikasi.
+    if (!accessToken) {
+        throw new AppError("Token user tidak tersedia untuk update metadata.", 500);
     }
 
-    const client = accessToken ? createSupabaseClientWithToken(accessToken) : supabase;
+    const client = createSupabaseClientWithToken(accessToken);
 
     const { error } = await client.auth.updateUser({
         data: metadata,
@@ -233,16 +230,19 @@ export const changePassword = async (req, res) => {
 
     if (signInError) throw new AppError("Password lama salah.", 401);
 
-    // 2. Gunakan req.supabase (dari middleware, dengan token user saat ini) untuk update password
+    // 2. Langsung revoke session sementara SEBELUM melanjutkan apapun.
+    //    Ini memastikan session orphan dihapus bahkan jika updateUser gagal sekalipun.
+    //    fire-and-forget dengan .catch() agar tidak memblok flow utama jika signOut error.
+    if (signInData?.session?.access_token) {
+        const tempClient = createSupabaseClientWithToken(signInData.session.access_token);
+        tempClient.auth.signOut().catch(() => {});
+    }
+
+    // 3. Gunakan req.supabase (dari middleware, dengan token user saat ini) untuk update password.
+    //    req.supabase sudah membawa Bearer token asli user — Supabase tahu persis siapa yang diupdate.
     const { error: updateError } = await req.supabase.auth.updateUser({
         password: req.validated.body.new_password,
     });
-
-    // 3. SEGERA HAPUS session sementara yang dibuat di langkah 1 agar tidak jadi orphan token
-    if (signInData?.session?.access_token) {
-        const tempClient = createSupabaseClientWithToken(signInData.session.access_token);
-        await tempClient.auth.signOut();
-    }
 
     if (updateError) throw new AppError(updateError.message, 400);
 

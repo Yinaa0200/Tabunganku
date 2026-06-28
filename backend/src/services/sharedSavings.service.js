@@ -573,22 +573,6 @@ export const updateSharedTransaction = async (userId, transactionId, payload) =>
     return data;
 };
 
-export const deleteSharedTransaction = async (userId, transactionId) => {
-    const transaction = await findTransactionOrFail(transactionId);
-    const sharedSavings = await findSharedSavingsOrFail(transaction.shared_savings_id);
-    await findMemberOrFail(userId, sharedSavings.id);
-
-    const { data, error } = await supabase.rpc("delete_shared_transaction_rpc", {
-        p_transaction_id: transactionId
-    });
-
-    if (error) {
-        throw new AppError(error.message, 400);
-    }
-
-    return data;
-};
-
 export const getSharedSavingsStatistics = async (userId, sharedSavingsId) => {
     const sharedSavings = await findSharedSavingsOrFail(sharedSavingsId);
     await findMemberOrFail(userId, sharedSavings.id);
