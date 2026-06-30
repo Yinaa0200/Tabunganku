@@ -43,5 +43,11 @@ router.get(
     validate(monthlySummaryQuerySchema, "query"),
     asyncHandler(getMonthlySummary)
 );
+router.get(
+    "/activity",
+    requireAuth,
+    validate(recentTransactionsQuerySchema, "query"),
+    asyncHandler(getRecentTransactions)
+);
 
 export default router;
