@@ -168,6 +168,7 @@ Field `errors` dapat berisi array detail error validasi Zod (atau `null` untuk e
 | `401` | Unauthorized | Token tidak ada, format salah, tidak valid, atau kedaluwarsa |
 | `403` | Forbidden | Token valid, tapi user tidak punya hak akses (bukan owner/member) |
 | `404` | Not Found | Resource tidak ditemukan |
+| `409` | Conflict | Resource/relasi sudah ada, misalnya user sudah menjadi anggota shared savings |
 | `500` | Internal Server Error | Error dari Supabase atau server internal |
 
 ---
@@ -227,26 +228,18 @@ Mendaftarkan pengguna baru. Supabase akan mengirimkan email verifikasi ke alamat
 
 | Field | Tipe | Wajib | Aturan |
 |---|---|---|---|
-<<<<<<< HEAD
-=======
 | `name` | `string` | Ya | Minimal 2 karakter |
 | `username` | `string` | Tidak | Minimal 3 karakter, maksimal 30 karakter |
-| `avatar` | `string` | Tidak | URL gambar valid (opsional) |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 | `email` | `string` | Ya | Format email valid |
-| `password` | `string` | Ya | Minimal 8 karakter |
+| `password` | `string` | Ya | Minimal 8 karakter, mengandung huruf kapital dan angka |
 
 **Contoh Request:**
 ```json
 {
-<<<<<<< HEAD
-=======
   "name": "John Doe",
   "username": "johndoe",
-  "avatar": "https://example.com/avatar.jpg",
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
   "email": "user@example.com",
-  "password": "password123"
+  "password": "Password123"
 }
 ```
 
@@ -259,25 +252,17 @@ Mendaftarkan pengguna baru. Supabase akan mengirimkan email verifikasi ke alamat
     "user": {
       "id": "uuid-user",
       "email": "user@example.com",
-<<<<<<< HEAD
-      "created_at": "2025-01-01T00:00:00Z",
-      "..."
-=======
       "name": "John Doe",
       "username": "johndoe",
       "avatar": null
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
     },
     "session": null
   }
 }
 ```
 
-<<<<<<< HEAD
-> Nilai `session` akan `null` karena akun belum diverifikasi via email. Setelah verifikasi, pengguna dapat login.
-=======
 > Response register berbeda dari login karena register hanya membuat akun dan mengembalikan profil pengguna beserta `session` (yang bisa `null` tergantung konfigurasi Supabase). Login akan mengembalikan token akses dan refresh token.
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
+> Avatar tidak dikirim saat register. User dapat mengubah avatar melalui `POST /api/profile/avatar`.
 
 **Response Error `400`:**
 ```json
@@ -306,7 +291,7 @@ Mengautentikasi pengguna dan mengembalikan access token serta refresh token.
 ```json
 {
   "email": "user@example.com",
-  "password": "password123"
+  "password": "Password123"
 }
 ```
 
@@ -321,30 +306,16 @@ Mengautentikasi pengguna dan mengembalikan access token serta refresh token.
     "user": {
       "id": "uuid-user",
       "email": "user@example.com",
-<<<<<<< HEAD
-      "user_metadata": {
-        "name": "John Doe",
-        "username": "johndoe",
-        "picture": "https://..."
-      },
-      "app_metadata": {
-        "role": "user"
-      }
-=======
       "name": "John Doe",
       "username": "johndoe",
       "avatar": "https://.../avatar.jpg"
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
     }
   }
 }
 ```
 
-<<<<<<< HEAD
-=======
 > Setelah login berhasil, client sebaiknya menyimpan `token` dan `refresh_token` untuk dipakai di endpoint lain yang memerlukan autentikasi.
 
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 **Response Error `401`:**
 ```json
 {
@@ -410,12 +381,12 @@ Mengakhiri sesi pengguna yang sedang aktif.
 ```json
 {
   "success": true,
-  "message": "Logout berhasil. Hapus token dari client.",
+  "message": "Logout berhasil. Session di server telah dihapus.",
   "data": null
 }
 ```
 
-> Setelah logout, hapus `token` dan `refresh_token` dari penyimpanan di sisi client (localStorage, cookie, dsb.).
+> Setelah logout, hapus `token` dan `refresh_token` dari penyimpanan di sisi client (localStorage, cookie, dsb.). Access token JWT lama dapat tetap diterima sampai kedaluwarsa, jadi client tidak boleh menggunakannya lagi setelah logout.
 
 ---
 
@@ -494,19 +465,13 @@ Memperbarui informasi profil pengguna. Setidaknya satu field harus dikirimkan.
 ```json
 {
   "success": false,
-<<<<<<< HEAD
-  "message": "Minimal salah satu field harus diisi."
-=======
   "message": "Minimal salah satu field harus diisi.",
   "errors": null
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 }
 ```
 
 ---
 
-<<<<<<< HEAD
-=======
 #### `POST /api/profile/avatar`
 
 Mengunggah foto profil pengguna melalui multipart form-data. File yang dikirim harus berupa gambar.
@@ -536,7 +501,6 @@ Mengunggah foto profil pengguna melalui multipart form-data. File yang dikirim h
 
 ---
 
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 #### `PUT /api/profile/password`
 
 Mengubah password pengguna. Password lama diverifikasi terlebih dahulu sebelum diganti.
@@ -551,8 +515,8 @@ Mengubah password pengguna. Password lama diverifikasi terlebih dahulu sebelum d
 **Contoh Request:**
 ```json
 {
-  "old_password": "password123",
-  "new_password": "newpassword456"
+  "old_password": "Password123",
+  "new_password": "NewPassword456"
 }
 ```
 
@@ -593,10 +557,7 @@ Membuat target tabungan pribadi baru. Saldo awal (`current_amount`) otomatis dis
 |---|---|---|---|
 | `name` | `string` | Ya | Minimal 1 karakter (setelah trim) |
 | `target_amount` | `number` | Ya | Harus positif (lebih dari 0) |
-<<<<<<< HEAD
-=======
 | `image_url` | `string` | Tidak | URL gambar valid (opsional) |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 
 **Contoh Request:**
 ```json
@@ -618,10 +579,7 @@ Membuat target tabungan pribadi baru. Saldo awal (`current_amount`) otomatis dis
       "name": "Dana Liburan Bali",
       "target_amount": 5000000,
       "current_amount": 0,
-<<<<<<< HEAD
-=======
       "image_url": null,
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
       "created_at": "2025-06-27T10:00:00Z",
       "updated_at": "2025-06-27T10:00:00Z"
     }
@@ -769,8 +727,6 @@ Memperbarui nama atau target amount tabungan. Setidaknya satu field harus dikiri
 
 ---
 
-<<<<<<< HEAD
-=======
 #### `POST /api/savings/:id/image`
 
 Mengunggah gambar untuk target tabungan pribadi. File yang dikirim harus berupa gambar.
@@ -802,7 +758,6 @@ Mengunggah gambar untuk target tabungan pribadi. File yang dikirim harus berupa 
 
 ---
 
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 #### `DELETE /api/savings/:id`
 
 Menghapus target tabungan berdasarkan UUID.
@@ -917,8 +872,7 @@ Membuat transaksi baru (setoran atau penarikan) yang dikaitkan dengan sebuah tab
   "success": true,
   "message": "Transaksi berhasil dicatat.",
   "data": {
-    "saldo_sekarang": 2000000,
-    "detail_transaksi": {
+    "transaction": {
       "id": "uuid-transaction",
       "user_id": "uuid-user",
       "savings_id": "550e8400-e29b-41d4-a716-446655440000",
@@ -926,16 +880,26 @@ Membuat transaksi baru (setoran atau penarikan) yang dikaitkan dengan sebuah tab
       "amount": 500000,
       "description": "Gaji bulan Juni",
       "created_at": "2025-06-27T10:00:00Z"
+    },
+    "savings": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "user_id": "uuid-user",
+      "name": "Dana Liburan Bali",
+      "target_amount": 5000000,
+      "current_amount": 2000000,
+      "image_url": null,
+      "created_at": "2025-06-27T09:00:00Z",
+      "updated_at": "2025-06-27T10:00:00Z"
     }
   }
 }
 ```
 
-**Response Error `400` (saldo tidak cukup):**
+**Response Error `400` (saldo negatif):**
 ```json
 {
   "success": false,
-  "message": "Saldo tabungan tidak mencukupi."
+  "message": "Saldo tabungan tidak boleh negatif."
 }
 ```
 
@@ -1053,8 +1017,7 @@ Memperbarui data transaksi. Saldo tabungan direcalculate secara otomatis: efek t
   "success": true,
   "message": "Transaksi berhasil diperbarui.",
   "data": {
-    "saldo_sekarang": 2250000,
-    "detail_transaksi": {
+    "transaction": {
       "id": "uuid-transaction",
       "user_id": "uuid-user",
       "savings_id": "uuid-savings",
@@ -1062,6 +1025,16 @@ Memperbarui data transaksi. Saldo tabungan direcalculate secara otomatis: efek t
       "amount": 750000,
       "description": "Gaji Juni (dikoreksi)",
       "created_at": "2025-06-01T09:00:00Z"
+    },
+    "savings": {
+      "id": "uuid-savings",
+      "user_id": "uuid-user",
+      "name": "Dana Liburan Bali",
+      "target_amount": 5000000,
+      "current_amount": 2250000,
+      "image_url": null,
+      "created_at": "2025-06-01T08:00:00Z",
+      "updated_at": "2025-06-01T09:00:00Z"
     }
   }
 }
@@ -1072,7 +1045,7 @@ Memperbarui data transaksi. Saldo tabungan direcalculate secara otomatis: efek t
 Saldo baru = (Saldo saat ini) - (Efek transaksi lama) + (Efek transaksi baru)
 ```
 
-Jika saldo hasil recalculation menjadi negatif, server mengembalikan error `400 "Saldo tabungan tidak mencukupi."`.
+Jika saldo hasil recalculation menjadi negatif, server mengembalikan error `400 "Saldo tabungan tidak boleh negatif."`.
 
 ---
 
@@ -1092,7 +1065,16 @@ Menghapus transaksi dan me-*rollback* dampaknya pada saldo tabungan secara otoma
   "success": true,
   "message": "Transaksi berhasil dihapus.",
   "data": {
-    "saldo_sekarang": 1500000
+    "deleted": true,
+    "transaction": {
+      "id": "uuid-transaction",
+      "user_id": "uuid-user",
+      "savings_id": "uuid-savings",
+      "type": "deposit",
+      "amount": 750000,
+      "description": "Gaji Juni (dikoreksi)",
+      "created_at": "2025-06-01T09:00:00Z"
+    }
   }
 }
 ```
@@ -1251,10 +1233,7 @@ Membuat grup tabungan bersama baru. Pembuat otomatis menjadi `owner` dan `invite
 | `name` | `string` | Ya | Minimal 1 karakter |
 | `description` | `string` | Tidak | Maksimal 255 karakter |
 | `target_amount` | `number` | Ya | Harus positif |
-<<<<<<< HEAD
-=======
 | `image_url` | `string` | Tidak | URL gambar valid (opsional) |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 
 **Contoh Request:**
 ```json
@@ -1278,10 +1257,7 @@ Membuat grup tabungan bersama baru. Pembuat otomatis menjadi `owner` dan `invite
       "description": "Tabungan bersama untuk liburan akhir tahun",
       "target_amount": 20000000,
       "current_amount": 0,
-<<<<<<< HEAD
-=======
       "image_url": null,
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
       "invite_code": "A3F9B2C1",
       "status": "active",
       "created_at": "2025-06-27T10:00:00Z"
@@ -1445,15 +1421,14 @@ Urutan penghapusan:
 {
   "success": true,
   "message": "Tabungan bersama berhasil dihapus.",
-  "data": null
+  "data": {
+    "deleted": true
+  }
 }
 ```
 
-<<<<<<< HEAD
-=======
-> Saat grup dihapus, status grup diubah menjadi `deleted` dan `invite_code` di-null-kan, sehingga kode undangan tidak lagi bisa digunakan untuk bergabung.
+> Saat grup dihapus, data `shared_savings` dihapus dari database setelah seluruh `shared_transactions` dan `shared_members` terkait dibersihkan.
 
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 ---
 
 #### `POST /api/shared-savings/join`
@@ -1464,7 +1439,7 @@ Bergabung ke grup tabungan bersama menggunakan kode undangan. Pengguna yang suda
 
 | Field | Tipe | Wajib | Aturan |
 |---|---|---|---|
-| `invite_code` | `string` | Ya | Kode undangan 8 karakter (case-sensitive) |
+| `invite_code` | `string` | Ya | Kode undangan 8 karakter; backend menormalisasi input ke uppercase |
 
 **Contoh Request:**
 ```json
@@ -1473,7 +1448,7 @@ Bergabung ke grup tabungan bersama menggunakan kode undangan. Pengguna yang suda
 }
 ```
 
-**Response `200 OK`:**
+**Response `201 Created`:**
 ```json
 {
   "success": true,
@@ -1495,6 +1470,15 @@ Bergabung ke grup tabungan bersama menggunakan kode undangan. Pengguna yang suda
 }
 ```
 
+**Response Error `409 Conflict` (sudah menjadi anggota):**
+```json
+{
+  "success": false,
+  "message": "Anda sudah bergabung ke tabungan bersama ini.",
+  "errors": null
+}
+```
+
 **Response Error `404`:**
 ```json
 {
@@ -1513,8 +1497,6 @@ Bergabung ke grup tabungan bersama menggunakan kode undangan. Pengguna yang suda
 
 ---
 
-<<<<<<< HEAD
-=======
 #### `POST /api/shared-savings/:id/image`
 
 Mengunggah gambar untuk grup tabungan bersama. File yang dikirim harus berupa gambar.
@@ -1548,7 +1530,6 @@ Mengunggah gambar untuk grup tabungan bersama. File yang dikirim harus berupa ga
 
 ---
 
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 #### `GET /api/shared-savings/:id/members`
 
 Mengambil daftar anggota dalam sebuah grup tabungan bersama. Hanya dapat diakses oleh anggota grup.
@@ -1646,7 +1627,7 @@ Mengambil statistik kontribusi per anggota dalam sebuah grup tabungan bersama.
 
 Base path: `/api/shared-transactions`
 
-Semua endpoint di bagian ini **memerlukan autentikasi**. Semua anggota grup (owner maupun member) dapat membuat, mengubah, dan menghapus transaksi.
+Semua endpoint di bagian ini **memerlukan autentikasi**. Semua anggota grup (owner maupun member) dapat membuat dan mengubah transaksi. Penghapusan transaksi hanya diizinkan untuk pembuat transaksi atau owner grup.
 
 > **Penting:** Setiap operasi transaksi secara otomatis memperbarui `current_amount` pada `shared_savings` terkait. Saldo tidak bisa menjadi negatif.
 
@@ -1681,7 +1662,7 @@ Membuat transaksi baru untuk sebuah grup tabungan bersama.
   "success": true,
   "message": "Transaksi tabungan bersama berhasil dicatat.",
   "data": {
-    "shared_transaction": {
+    "transaction": {
       "id": "uuid-shared-transaction",
       "shared_savings_id": "uuid-shared-savings",
       "user_id": "uuid-user",
@@ -1690,7 +1671,18 @@ Membuat transaksi baru untuk sebuah grup tabungan bersama.
       "description": "Kontribusi bulan Juni - John",
       "created_at": "2025-06-27T10:00:00Z"
     },
-    "saldo_sekarang": 8500000
+    "shared_savings": {
+      "id": "uuid-shared-savings",
+      "owner_id": "uuid-owner",
+      "name": "Liburan Keluarga 2026",
+      "description": "Tabungan bersama untuk liburan akhir tahun",
+      "target_amount": 20000000,
+      "current_amount": 8500000,
+      "image_url": null,
+      "invite_code": "A3F9B2C1",
+      "status": "active",
+      "created_at": "2025-06-27T09:00:00Z"
+    }
   }
 }
 ```
@@ -1707,7 +1699,7 @@ Membuat transaksi baru untuk sebuah grup tabungan bersama.
 ```json
 {
   "success": false,
-  "message": "Saldo tabungan bersama tidak mencukupi."
+  "message": "Saldo tabungan bersama tidak boleh negatif."
 }
 ```
 
@@ -1737,7 +1729,7 @@ Memperbarui data transaksi bersama. Saldo grup direcalculate secara otomatis.
   "success": true,
   "message": "Transaksi tabungan bersama berhasil diperbarui.",
   "data": {
-    "shared_transaction": {
+    "transaction": {
       "id": "uuid-shared-transaction",
       "shared_savings_id": "uuid-shared-savings",
       "user_id": "uuid-user",
@@ -1746,7 +1738,18 @@ Memperbarui data transaksi bersama. Saldo grup direcalculate secara otomatis.
       "description": "Kontribusi bulan Juni - John (dikoreksi)",
       "created_at": "2025-06-27T10:00:00Z"
     },
-    "saldo_sekarang": 9000000
+    "shared_savings": {
+      "id": "uuid-shared-savings",
+      "owner_id": "uuid-owner",
+      "name": "Liburan Keluarga 2026",
+      "description": "Tabungan bersama untuk liburan akhir tahun",
+      "target_amount": 20000000,
+      "current_amount": 9000000,
+      "image_url": null,
+      "invite_code": "A3F9B2C1",
+      "status": "active",
+      "created_at": "2025-06-27T09:00:00Z"
+    }
   }
 }
 ```
@@ -1769,7 +1772,16 @@ Menghapus transaksi bersama dan me-*rollback* dampaknya pada saldo grup.
   "success": true,
   "message": "Transaksi tabungan bersama berhasil dihapus.",
   "data": {
-    "saldo_sekarang": 7500000
+    "deleted": true,
+    "transaction": {
+      "id": "uuid-shared-transaction",
+      "shared_savings_id": "uuid-shared-savings",
+      "user_id": "uuid-user",
+      "type": "deposit",
+      "amount": 1500000,
+      "description": "Kontribusi bulan Juni - John (dikoreksi)",
+      "created_at": "2025-06-27T10:00:00Z"
+    }
   }
 }
 ```
@@ -1787,10 +1799,7 @@ Menghapus transaksi bersama dan me-*rollback* dampaknya pada saldo grup.
 | `name` | `string` | Nama target tabungan |
 | `target_amount` | `numeric` | Jumlah target |
 | `current_amount` | `numeric` | Saldo saat ini (default: `0`) |
-<<<<<<< HEAD
-=======
 | `image_url` | `string` | URL gambar tabungan (opsional) |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 | `created_at` | `timestamptz` | Waktu pembuatan |
 | `updated_at` | `timestamptz` | Waktu terakhir diperbarui |
 
@@ -1816,10 +1825,7 @@ Menghapus transaksi bersama dan me-*rollback* dampaknya pada saldo grup.
 | `description` | `string` | Deskripsi (default: `""`) |
 | `target_amount` | `numeric` | Jumlah target bersama |
 | `current_amount` | `numeric` | Saldo saat ini (default: `0`) |
-<<<<<<< HEAD
-=======
 | `image_url` | `string` | URL gambar grup (opsional) |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 | `invite_code` | `string` | Kode undangan 8 karakter hex uppercase unik |
 | `status` | `string` | Status grup (default: `"active"`) |
 | `created_at` | `timestamptz` | Waktu pembuatan |
@@ -1846,18 +1852,14 @@ Menghapus transaksi bersama dan me-*rollback* dampaknya pada saldo grup.
 | `description` | `string` | Keterangan (default: `""`) |
 | `created_at` | `timestamptz` | Waktu transaksi |
 
-### Tabel: `profiles` (Baca-saja oleh API)
+### Tabel: `profiles`
 
 | Kolom | Tipe | Deskripsi |
 |---|---|---|
 | `id` | `UUID` (FK) | Referensi ke auth user |
-<<<<<<< HEAD
-| `name` | `string` | Nama tampilan pengguna |
-=======
 | `full_name` | `string` | Nama tampilan pengguna |
 | `username` | `string` | Username pengguna |
 | `avatar_url` | `string` | URL avatar pengguna |
->>>>>>> 22b4a4f0666d8c8aaeb593e490b3ce5d5002b525
 
 ---
 
@@ -1870,7 +1872,7 @@ Semua input divalidasi menggunakan skema Zod sebelum mencapai controller. Jika v
 | Domain | Field | Aturan |
 |---|---|---|
 | Register | `email` | Format email valid |
-| Register | `password` | Minimal 8 karakter |
+| Register | `password` | Minimal 8 karakter, mengandung huruf kapital dan angka |
 | Login | `password` | Tidak boleh kosong |
 | Refresh | `refresh_token` | Tidak boleh kosong |
 | Update Profile | — | Minimal satu field |
@@ -1892,7 +1894,7 @@ Semua input divalidasi menggunakan skema Zod sebelum mencapai controller. Jika v
 ### Aturan Saldo
 
 - Saldo tidak pernah bisa menjadi **negatif**.
-- Pada `withdrawal` (transaksi pribadi maupun bersama): jika `amount > current_amount`, server mengembalikan `400 "Saldo tabungan tidak mencukupi."`.
+- Pada `withdrawal` (transaksi pribadi maupun bersama): jika hasil saldo menjadi negatif, server mengembalikan `400 "Saldo tabungan tidak boleh negatif."` atau `400 "Saldo tabungan bersama tidak boleh negatif."`.
 - Pada `DELETE` transaksi: saldo di-*rollback* dengan membalik efek transaksi yang dihapus.
 - Pada `PATCH` transaksi: saldo di-*rollback* dari nilai lama, lalu nilai baru diterapkan.
 
@@ -1900,12 +1902,21 @@ Semua input divalidasi menggunakan skema Zod sebelum mencapai controller. Jika v
 
 - Semua operasi pada `shared_savings` dan `shared_transactions` memeriksa keanggotaan pengguna terlebih dahulu.
 - `PATCH` dan `DELETE` pada **shared_savings** hanya dapat dilakukan oleh `owner`.
-- Semua anggota (owner dan member) dapat membuat, mengubah, dan menghapus **shared_transactions**.
+- Semua anggota (owner dan member) dapat membuat dan mengubah **shared_transactions**.
+- Penghapusan **shared_transactions** hanya dapat dilakukan oleh pembuat transaksi atau owner grup.
+- Jika user sudah menjadi anggota shared savings lalu mencoba join dengan invite code yang sama, server mengembalikan `409 Conflict`.
 
 ### Invite Code
 
 - Dibuat secara acak menggunakan `crypto.randomBytes(4).toString("hex").toUpperCase()` → 8 karakter hex uppercase (contoh: `"A3F9B2C1"`).
 - Dijamin unik dengan mekanisme retry hingga 5 kali percobaan.
+- Input `invite_code` saat join akan di-trim dan dinormalisasi ke uppercase sebelum dicari.
+
+### Profile
+
+- `PUT /api/profile` menyimpan `name`, `username`, dan `avatar` ke tabel `profiles`.
+- Sinkronisasi metadata Supabase Auth dilakukan best-effort. Jika metadata Auth gagal diperbarui, update profile tetap berhasil selama tabel `profiles` berhasil disimpan.
+- `PUT /api/profile/password` memverifikasi `old_password` dengan membuat session sementara, lalu memakai session tersebut untuk mengganti password.
 
 ---
 
@@ -1931,7 +1942,7 @@ Error yang disengaja (misal: validasi bisnis, resource tidak ditemukan) dibuat m
 throw new AppError("Target tabungan tidak ditemukan.", 404);
 ```
 
-Server akan menggunakan `statusCode` dari `AppError` sebagai HTTP status code response.
+Server akan menggunakan `statusCode` dari `AppError` sebagai HTTP status code response. Class `AppError` ditandai sebagai operational error, sehingga pesan yang dikirim saat membuat `AppError` akan diteruskan ke response.
 
 ### Error Autentikasi (Langsung dari Middleware)
 
