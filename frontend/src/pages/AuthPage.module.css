@@ -1,0 +1,223 @@
+﻿.page {
+  min-height: 100vh;
+  display: flex;
+  font-family: Georgia, serif;
+}
+
+/* ── Sisi kiri: visual + kutipan ── */
+.visualSide {
+  flex: 1;
+  background: #D2E9FF;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px 64px;
+  overflow: hidden;
+}
+
+/* Lengkung organik (scallop) yang membelah dua sisi.
+   Foam (putih) digeser sedikit ke kiri agar tepi kirinya
+   muncul sebagai garis tipis di luar lekukan peach. */
+.scallopFoam {
+  position: absolute;
+  right: 5px;
+  top: 0;
+  bottom: 0;
+  width: 140px;
+  height: 1000%;
+  z-index: 1;
+}
+
+.scallop {
+  position: absolute;
+  right: -1px;
+  top: 0;
+  bottom: 0;
+  width: 70px;
+  height: 300%;
+  z-index: 2;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Lora', Georgia, serif;
+  font-size: 17px;
+  font-weight: 600;
+  color: #2C4A3B;
+  position: relative;
+  z-index: 1;
+}
+
+.quoteBlock {
+  max-width: 460px;
+  margin-top: 64px;
+  position: relative;
+  z-index: 1;
+}
+
+.quote {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 22px;
+  line-height: 1.5;
+  font-style: italic;
+  color: #1F3A2D;
+}
+
+.quoteAuthor {
+  margin-top: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #3D5A4A;
+  letter-spacing: 0.2px;
+}
+
+/* ── Sisi kanan: form ── */
+.formSide {
+  flex: 1;
+  background: #FFEED9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.formWrap {
+  width: 100%;
+  max-width: 380px;
+}
+
+.title {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 32px;
+  font-weight: 300;
+  color: #000000;
+  line-height: 1;
+}
+
+.subtitle {
+  font-size: 15px;
+  color: #000000;
+  margin-top: 6px;
+  margin-bottom: 36px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.footer {
+  font-size: 13px;
+  color: #39A7FF;
+  text-align: center;
+  margin-top: 24px;
+}
+
+.link {
+  color: #39A7FF;
+  font-weight: 300;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .page {
+    flex-direction: column;
+  }
+
+  .visualSide {
+    flex: none;
+    padding: 40px 32px;
+    min-height: 280px;
+  }
+
+  .scallop,
+  .scallopFoam {
+    display: none;
+  }
+
+  .quoteBlock {
+    margin-top: 32px;
+  }
+
+  .quote {
+    font-size: 18px;
+  }
+
+  .formSide {
+    flex: none;
+    padding: 40px 24px 56px;
+  }
+}
+
+/* ── Field input ala DimensiBunga: pill abu-abu, label kecil uppercase ── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #000000;
+}
+
+.fieldInput {
+  border: none;
+  border-radius: 12px;
+  background: #EAF5FF;
+  padding: 13px 16px;
+  font-size: 15px;
+  color: #333;
+  font-family: inherit;
+  outline: none;
+  transition: background 0.15s;
+}
+
+.fieldInput::placeholder {
+  color: #e1f2ff;
+}
+
+.fieldInput:focus {
+  background: #e1f2ff;
+}
+
+.fieldError {
+  font-size: 12px;
+  color: #E53E3E;
+}
+
+/* ── Tombol Login/Daftar bentuk pill ── */
+.submitBtn {
+  display: block;
+      margin: 1.8rem auto 0;
+      padding: 11px 40px;
+      background: rgb(217, 234, 255);
+      border: 1.5px solid #ffffff;
+      border-radius: 999px;
+      font-size: 15px;
+      color: #1a1a1a;
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: background 0.15s;
+}
+
+.submitBtn:hover {
+  background: #abcdff;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

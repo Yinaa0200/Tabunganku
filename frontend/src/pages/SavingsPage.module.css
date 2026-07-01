@@ -1,0 +1,72 @@
+﻿.page { display: flex; flex-direction: column; gap: 24px; }
+.loading { padding: 40px; text-align: center; color: var(--color-text-3); }
+
+.header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.title { font-size: 22px; font-weight: 700; }
+.subtitle { font-size: 13px; color: var(--color-text-3); margin-top: 2px; }
+
+.toolbar { display: flex; gap: 12px; }
+.searchInput { font-size: 13px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.15s;
+  background-color: aliceblue;
+}
+
+.card:hover { box-shadow: var(--shadow-md); }
+
+.cardHeader { display: flex; align-items: center; justify-content: space-between; }
+
+.cardIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardActions { display: flex; gap: 4px; }
+
+.actionBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-3);
+  transition: all 0.12s;
+}
+
+.actionBtn:hover { background: var(--color-surface-2); color: var(--color-text); }
+.danger:hover { background: var(--color-danger-light); color: var(--color-danger); }
+
+.cardName { font-size: 15px; font-weight: 600; }
+
+.amounts { display: flex; flex-direction: column; }
+.current { font-size: 18px; font-weight: 700; color: var(--color-primary); }
+.target { font-size: 12px; color: var(--color-text-3); }
+
+.cardDate { font-size: 11px; color: var(--color-text-4); margin-top: 2px; }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.pageInfo { font-size: 13px; color: var(--color-text-3); }
+
+.form { display: flex; flex-direction: column; gap: 16px; }
