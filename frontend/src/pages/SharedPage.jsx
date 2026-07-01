@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { Plus, Users, Eye, LogOut, Copy, Search } from 'lucide-react'
 import { sharedSavingsApi } from '../api/shared'
@@ -207,7 +207,7 @@ export default function SharedPage() {
                       </button>
                     </div>
                   </div>
-                  <p className={styles.cardDate}>{g.member_count ?? ''} anggota Â· Dibuat {formatDate(g.created_at)}</p>
+                  <p className={styles.cardDate}>{g.member_count ?? 0} anggota · Dibuat {formatDate(g.created_at)}</p>
                 </div>
               )
             })}
