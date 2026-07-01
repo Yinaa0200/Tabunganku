@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+import axios from 'axios'
 
 const BASE_URL = 'https://tabungan-iki-ina.vercel.app/api'
 
@@ -12,6 +12,11 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  // When sending FormData (file uploads), let the browser set the correct
+  // multipart/form-data boundary instead of forcing application/json.
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
   }
   return config
 })
@@ -37,7 +42,7 @@ api.interceptors.response.use(
           original.headers.Authorization = `Bearer ${access_token}`
           return api(original)
         } catch {
-          // Refresh failed â€” force logout
+          // Refresh failed — force logout
           localStorage.removeItem('token')
           localStorage.removeItem('refresh_token')
           window.location.href = '/login'

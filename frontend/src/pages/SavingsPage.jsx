@@ -1,6 +1,6 @@
-﻿import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Search, PiggyBank, Edit2, Trash2, Eye } from 'lucide-react'
+import { Plus, Search, PiggyBank, Edit2, Trash2, Eye, ArrowUpDown } from 'lucide-react'
 import { savingsApi } from '../api/savings'
 import { formatRupiah, calcProgress, formatDate, getErrorMessage } from '../utils/helpers'
 import Button from '../components/ui/Button'
@@ -29,7 +29,9 @@ function SavingsForm({ initial, onSubmit, loading }) {
   const handleSubmit = (e) => {
     e.preventDefault()
     if (!validate()) return
-    onSubmit({ name: form.name, target_amount: Number(form.target_amount) })
+    // Include the selected image file so the parent can upload it after
+    // the savings goal is created/updated.
+    onSubmit({ name: form.name, target_amount: Number(form.target_amount), image: form.image || null })
   }
 
   return (
@@ -68,6 +70,7 @@ export default function SavingsPage() {
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState('created_desc')
   const [modalCreate, setModalCreate] = useState(false)
   const [modalEdit, setModalEdit] = useState(null)
   const [modalDelete, setModalDelete] = useState(null)
@@ -89,12 +92,45 @@ export default function SavingsPage() {
   useEffect(() => {
     const t = setTimeout(() => fetchSavings(1, search), 300)
     return () => clearTimeout(t)
-  }, [search])
+  }, [fetchSavings, search])
 
-  const handleCreate = async (form) => {
+  // Sort the current page of savings client-side by the selected criteria.
+  const sortedSavings = useMemo(() => {
+    const list = [...savings]
+    switch (sortBy) {
+      case 'name_asc':
+        return list.sort((a, b) => a.name.localeCompare(b.name))
+      case 'name_desc':
+        return list.sort((a, b) => b.name.localeCompare(a.name))
+      case 'progress_desc':
+        return list.sort(
+          (a, b) => calcProgress(b.current_amount, b.target_amount) - calcProgress(a.current_amount, a.target_amount)
+        )
+      case 'progress_asc':
+        return list.sort(
+          (a, b) => calcProgress(a.current_amount, a.target_amount) - calcProgress(b.current_amount, b.target_amount)
+        )
+      case 'created_asc':
+        return list.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      case 'created_desc':
+      default:
+        return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    }
+  }, [savings, sortBy])
+
+  // Uploads the selected image to the dedicated /savings/:id/image endpoint.
+  const uploadImageIfNeeded = async (savingsId, image) => {
+    if (!image) return
+    const fd = new FormData()
+    fd.append('image', image)
+    await savingsApi.uploadImage(savingsId, fd)
+  }
+
+  const handleCreate = async ({ image, ...data }) => {
     setSubmitting(true)
     try {
-      await savingsApi.create(form)
+      const { data: res } = await savingsApi.create(data)
+      await uploadImageIfNeeded(res.data.savings.id, image)
       toast.success('Tabungan berhasil dibuat!')
       setModalCreate(false)
       fetchSavings(1)
@@ -105,10 +141,11 @@ export default function SavingsPage() {
     }
   }
 
-  const handleEdit = async (form) => {
+  const handleEdit = async ({ image, ...data }) => {
     setSubmitting(true)
     try {
-      await savingsApi.update(modalEdit.id, form)
+      await savingsApi.update(modalEdit.id, data)
+      await uploadImageIfNeeded(modalEdit.id, image)
       toast.success('Tabungan berhasil diperbarui!')
       setModalEdit(null)
       fetchSavings(pagination.page)
@@ -153,6 +190,22 @@ export default function SavingsPage() {
           prefix={<Search size={15} />}
           className={styles.searchInput}
         />
+        <div className={styles.sortWrap}>
+          <ArrowUpDown size={15} className={styles.sortIcon} />
+          <select
+            className={styles.sortSelect}
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            aria-label="Urutkan tabungan"
+          >
+            <option value="created_desc">Terbaru</option>
+            <option value="created_asc">Terlama</option>
+            <option value="name_asc">Nama (A–Z)</option>
+            <option value="name_desc">Nama (Z–A)</option>
+            <option value="progress_desc">Progress Tertinggi</option>
+            <option value="progress_asc">Progress Terendah</option>
+          </select>
+        </div>
       </div>
 
       {loading ? (
@@ -167,7 +220,7 @@ export default function SavingsPage() {
       ) : (
         <>
           <div className={styles.grid}>
-            {savings.map((s) => {
+            {sortedSavings.map((s) => {
               const progress = calcProgress(s.current_amount, s.target_amount)
               return (
                 <div key={s.id} className={styles.card}>
@@ -187,6 +240,9 @@ export default function SavingsPage() {
                       </button>
                     </div>
                   </div>
+                  {s.image_url && (
+                    <img src={s.image_url} alt={s.name} className={styles.cardImage} />
+                  )}
                   <h3 className={styles.cardName}>{s.name}</h3>
                   <div className={styles.amounts}>
                     <span className={styles.current}>{formatRupiah(s.current_amount)}</span>

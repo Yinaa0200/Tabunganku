@@ -1,4 +1,4 @@
-﻿import api from './client'
+import api from './client'
 
 export const savingsApi = {
   list: (params) => api.get('/savings', { params }),
@@ -7,4 +7,6 @@ export const savingsApi = {
   update: (id, data) => api.put(`/savings/${id}`, data),
   delete: (id) => api.delete(`/savings/${id}`),
   getTransactions: (id, params) => api.get(`/savings/${id}/transactions`, { params }),
+  // Uploads a savings image. Expects a FormData with an `image` field.
+  uploadImage: (id, formData) => api.post(`/savings/${id}/image`, formData),
 }

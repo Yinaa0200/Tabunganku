@@ -1,4 +1,4 @@
-﻿.page { display: flex; flex-direction: column; gap: 20px; }
+.page { display: flex; flex-direction: column; gap: 20px; }
 .loading { padding: 40px; text-align: center; color: var(--color-text-3); }
 
 .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
@@ -19,6 +19,77 @@
 }
 .filterBtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .filterActive { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); }
+
+.dateBar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+.dateIcon { color: var(--color-text-3); }
+.dateField { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-3); }
+.dateInput {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.dateInput:focus { outline: none; border-color: var(--color-primary); }
+.clearDate {
+  font-size: 12px;
+  color: var(--color-danger);
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+}
+.clearDate:hover { background: var(--color-danger-light); }
+
+.savingsName {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-primary);
+  margin-top: 2px;
+}
+
+.actions { display: flex; gap: 4px; flex-shrink: 0; }
+.actBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-3);
+  transition: all 0.12s;
+}
+.actBtn:hover { background: var(--color-surface-2); color: var(--color-text); }
+.red:hover { background: var(--color-danger-light); color: var(--color-danger); }
+
+.form { display: flex; flex-direction: column; gap: 16px; }
+.typeToggle { display: flex; gap: 8px; }
+.typeBtn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-3);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: all 0.12s;
+}
+.deposit { border-color: var(--color-success); background: var(--color-success-light); color: var(--color-success); }
+.withdrawal { border-color: var(--color-danger); background: var(--color-danger-light); color: var(--color-danger); }
 
 .card {
   background: var(--color-surface);

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, TrendingDown, Plus, Trash2, Edit2 } from 'lucide-react'
 import { savingsApi } from '../api/savings'
@@ -177,7 +177,7 @@ export default function SavingsDetailPage() {
             background: progress >= 100 ? 'var(--color-success-light)' : 'var(--color-primary-light)',
             color: progress >= 100 ? 'var(--color-success)' : 'var(--color-primary)',
           }}>
-            {progress >= 100 ? 'ðŸŽ‰ Tercapai!' : `${progress}%`}
+            {progress >= 100 ? '🎉 Tercapai!' : `${progress}%`}
           </div>
         </div>
         <ProgressBar value={progress} showLabel={false} size="lg" />

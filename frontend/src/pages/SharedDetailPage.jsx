@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { ArrowLeft, TrendingUp, TrendingDown, Plus, Users, Trash2, Edit2, Copy } from 'lucide-react'
 import { sharedSavingsApi, sharedTransactionsApi } from '../api/shared'
@@ -73,7 +73,7 @@ export default function SharedDetailPage() {
   const [modalDelete, setModalDelete] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  const loadData = async (page = 1) => {
+  const loadData = useCallback(async (page = 1) => {
     try {
       const [gRes, mRes, tRes] = await Promise.all([
         sharedSavingsApi.get(id),
@@ -89,9 +89,9 @@ export default function SharedDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
 
-  useEffect(() => { loadData(1) }, [id])
+  useEffect(() => { loadData(1) }, [loadData])
 
   const handleCreateTx = async (form) => {
     setSubmitting(true)
@@ -170,7 +170,7 @@ export default function SharedDetailPage() {
             background: progress >= 100 ? 'var(--color-success-light)' : '#F0F0FF',
             color: progress >= 100 ? 'var(--color-success)' : '#4F46E5',
           }}>
-            {progress >= 100 ? 'ðŸŽ‰ Tercapai!' : `${progress}%`}
+            {progress >= 100 ? '🎉 Tercapai!' : `${progress}%`}
           </div>
         </div>
         <ProgressBar value={progress} showLabel={false} size="lg" />
